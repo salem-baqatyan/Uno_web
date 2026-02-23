@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="icon" type="image/png" href="img/codenames_pro_icon.png">
+    <link rel="apple-touch-icon" href="img/codenames_pro_icon.png">
+    <title>Codenames Pro</title>
+    <style>
+        /* <!-- CSS Section --> */
+        /* --- Global & Root --- */
+        :root {
+            --bg-dark: #000000; --panel-bg: #1a1a1a; 
+            --green-action: #4caf50; --green-gradient: linear-gradient(to bottom, #7ed321, #417505);
+            --text-gray: #aaaaaa; --modal-bg: #2a2a2a; 
+            --mobile-max-width: 450px;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { 
+            margin: 0; background-color: var(--bg-dark); color: white; 
+            display: flex; justify-content: center; align-items: center; height: 100dvh; overflow: hidden; 
+        }
+
+        /* --- App Wrapper --- */
+        .mobile-wrapper {
+            width: 100%; max-width: var(--mobile-max-width); height: 100dvh; background: #000;
+            display: flex; flex-direction: column; border-left: 1px solid #333; border-right: 1px solid #333;
+            position: relative; padding: 20px;
+        }
+
+        /* --- Header Section --- */
+        .logo-section { text-align: center; margin-top: 20px; margin-bottom: 30px; }
+        .logo-title { font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px rgba(126, 211, 33, 0.4); }
+        .logo-subtitle { color: var(--green-action); font-size: 0.8rem; margin-top: 5px; font-weight: bold; }
+
+        /* --- Action Panels --- */
+        .panel { background: var(--panel-bg); border-radius: 20px; padding: 18px; margin-bottom: 15px; border: 1px solid #333; }
+        .panel-title { font-size: 0.9rem; font-weight: bold; margin-bottom: 15px; color: #eee; display: flex; align-items: center; gap: 8px; }
+        
+        .input-group { display: flex; gap: 8px; }
+        .main-input { flex: 1; background: #000; border: 1px solid #444; color: white; padding: 12px; border-radius: 12px; font-size: 0.9rem; outline: none; }
+        .main-input:focus { border-color: var(--green-action); }
+
+        /* --- Buttons --- */
+        .btn { border: none; border-radius: 12px; font-weight: 900; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px; color: white; }
+        .btn-action { background: var(--green-gradient); border: 1px solid #b8e986; box-shadow: 0 3px 0 #2e5a03; padding: 12px 20px; }
+        .btn-action:active { transform: translateY(2px); box-shadow: 0 1px 0 #2e5a03; }
+        
+        .btn-outline { background: transparent; border: 1px solid var(--green-action); color: var(--green-action); padding: 12px; width: 100%; margin-top: 15px; }
+
+        /* --- Custom Radio Buttons --- */
+        .radio-container { display: flex; gap: 15px; margin-top: 5px; }
+        .radio-item { flex: 1; position: relative; }
+        .radio-item input { position: absolute; opacity: 0; cursor: pointer; }
+        .radio-label { 
+            display: block; border: 1px solid #444; padding: 10px; 
+            border-radius: 10px; text-align: center; font-size: 0.8rem; cursor: pointer; transition: 0.3s;
+        }
+        .radio-item input:checked + .radio-label { 
+            border-color: var(--green-action); background: rgba(126, 211, 33, 0.1); color: var(--green-action); 
+        }
+        .radio-label span { display: block; font-size: 0.65rem; color: #666; margin-top: 2px; }
+
+        /* --- Room List Table --- */
+        .rooms-container { flex: 1; overflow-y: auto; margin-top: 5px; }
+        .rooms-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .rooms-table th { text-align: right; color: var(--text-gray); padding: 12px 10px; border-bottom: 1px solid #333; position: sticky; top: 0; background: var(--panel-bg); z-index: 5; }
+        .rooms-table td { padding: 14px 10px; border-bottom: 1px solid #222; }
+        
+        .room-id { font-family: 'Courier New', monospace; color: var(--green-action); font-weight: bold; }
+        .status-badge { padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; }
+        .status-lobby { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .status-game { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
+</head>
+<body>
+<!-- HTML Section -->
+
+<div class="mobile-wrapper">
+    <div class="logo-section">
+        <div class="logo-title">CODENAMES</div>
+        <div class="logo-subtitle">PRO VERSION</div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title"><span>🔑</span> انضمام سريع</div>
+        <div class="input-group">
+            <input type="text" id="joinIdInput" class="main-input" placeholder="رمز الغرفة أو الرابط">
+            <button class="btn btn-action" onclick="joinRoom()">انضمام</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title"><span>🆕</span> إنشاء غرفة جديدة</div>
+        <div class="radio-container">
+            <div class="radio-item">
+                <input type="radio" name="roomType" id="publicType" value="public" checked>
+                <label for="publicType" class="radio-label">عامة<span>تظهر للجميع</span></label>
+            </div>
+            <div class="radio-item">
+                <input type="radio" name="roomType" id="privateType" value="private">
+                <label for="privateType" class="radio-label">خاصة<span>دعوة فقط</span></label>
+            </div>
+        </div>
+        <button class="btn btn-outline" onclick="createRoom()">إنشاء غرفة جديدة</button>
+    </div>
+
+    <div class="panel" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+        <div class="panel-title"><span>🌐</span> تصفح الغرف العامة</div>
+        <div class="rooms-container">
+            <table class="rooms-table">
+    <thead>
+        <tr>
+            <th>الرمز</th>
+            <th>اللاعبين</th>
+            <th>المود</th> <th>الحالة</th>
+        </tr>
+    </thead>
+    <tbody id="roomsListBody"></tbody>
+</table>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
+    import { get, child } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyC95r_D7FVO-cynZ-gK6zbldvvrY4HD2YQ",
+        authDomain: "codenames-5fd71.firebaseapp.com",
+        projectId: "codenames-5fd71",
+        databaseURL: "https://codenames-5fd71-default-rtdb.firebaseio.com",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const joinInput = document.getElementById('joinIdInput');
+    const joinBtn = document.querySelector('.btn-action');
+
+    document.getElementById('joinIdInput').addEventListener('input', (e) => {
+        let value = e.target.value.trim();
+        
+        if (value.includes('?r=')) {
+            try {
+                const urlParams = new URLSearchParams(value.split('?')[1]);
+                const roomCode = urlParams.get('r');
+                if (roomCode) {
+                    e.target.value = roomCode;
+                }
+            } catch (err) {
+                console.error("خطأ في تحليل الرابط");
+            }
+        }
+    });
+
+    async function checkRoomExists(roomId) {
+        const dbRef = ref(db);
+        try {
+            const snapshot = await get(child(dbRef, `rooms/${roomId}`));
+        } catch (error) {
+            resetBtnStyle();
+        }
+    }
+
+    function resetBtnStyle() {
+        joinBtn.style.filter = "none";
+        joinBtn.style.boxShadow = "0 3px 0 #2e5a03";
+        joinBtn.innerText = "انضمام";
+    }
+
+    joinInput.addEventListener('input', async (e) => {
+        let value = e.target.value.trim();
+
+        if (value.includes('?r=')) {
+            const urlParams = new URLSearchParams(value.split('?')[1]);
+            value = urlParams.get('r');
+            e.target.value = value;
+        }
+
+        if (value.length >= 4) {
+            checkRoomExists(value);
+        } else {
+            resetBtnStyle();
+        }
+    });
+
+    window.joinRoom = () => {
+        let val = joinInput.value.trim();
+        if (!val) return;
+        location.href = `lobby.html?r=${val}`;
+    };
+
+    window.createRoom = () => {
+        const newId = Math.random().toString(36).substring(2, 8);
+        const selectedType = document.querySelector('input[name="roomType"]:checked').value;
+        location.href = `lobby.html?r=${newId}&type=${selectedType}`;
+    };
+
+    const roomsRef = ref(db, 'rooms');
+    onValue(roomsRef, (snapshot) => {
+        const rooms = snapshot.val();
+        const tbody = document.getElementById('roomsListBody');
+        tbody.innerHTML = '';
+
+        if (!rooms) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:30px; color:#555;">لا توجد غرف متاحة</td></tr>';
+            return;
+        }
+
+        Object.entries(rooms).forEach(([id, room]) => {
+            if (room.settings?.visibility === 'private') return;
+
+            const playersCount = room.players ? Object.keys(room.players).length : 0;
+            if (playersCount === 0) return;
+
+            const rawMode = room.settings?.mode || '—';
+            const modeText = rawMode === 'Co_Op' ? 'تعاوني' : (rawMode === 'PvP' ? 'تنافسي' : rawMode);
+
+            const inGame = room.status === 'started';
+            
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.onclick = () => location.href = `lobby.html?r=${id}`;
+            tr.innerHTML = `
+                <td class="room-id">${id.toUpperCase()}</td>
+                <td style="color:#ddd;">👤 ${playersCount}</td>
+                <td style="color:#888;">${modeText}</td>
+                <td>
+                    <span class="status-badge ${inGame ? 'status-game' : 'status-lobby'}">
+                        ${inGame ? '🎮' : '⌛'}
+                    </span>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        if (tbody.innerHTML === '') {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:30px; color:#555;">لا توجد غرف نشطة حالياً</td></tr>';
+        }
+    });
+
+
+</script>
+</body>
+</html>
