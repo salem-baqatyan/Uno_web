@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UNO! Pro - Playing</title>
+    <style>
+        /* --- الأساسيات (مأخوذة من اللوبي لضمان التطابق) --- */
+        :root {
+            --bg-dark: #000000;
+            --arena-bg: #111111;
+            --uno-red: #ff5555;
+            --uno-blue: #5555ff;
+            --uno-green: #55aa55;
+            --uno-yellow: #ffaa00;
+            --text-gray: #aaaaaa;
+            --mobile-max-width: 450px;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { 
+            margin: 0; background-color: var(--bg-dark); color: white; 
+            display: flex; justify-content: center; align-items: center; height: 100dvh; overflow: hidden; 
+        }
+
+        .mobile-wrapper {
+            width: 100%; max-width: var(--mobile-max-width); height: 100dvh; 
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            display: flex; flex-direction: column; position: relative; overflow: hidden;
+        }
+
+        /* --- 1. App Bar (نفس اللوبي بالضبط) --- */
+        .top-bar { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 10px 15px; flex-shrink: 0; z-index: 100;
+        }
+        .top-left, .top-right { display: flex; gap: 8px; align-items: center; }
+        .top-timer { 
+            color: white; font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', Courier, monospace; 
+            position: absolute; left: 50%; transform: translateX(-50%); 
+        }
+        .icon-circle { 
+            width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; border: 0.5px solid white; cursor: pointer; color: white; 
+        }
+        .btn-pill { 
+            background: rgba(255,255,255,0.1); border: 1px solid #444; padding: 6px 12px; 
+            border-radius: 20px; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: white; 
+        }
+
+        /* --- 2. Arena (المركز) --- */
+        .game-area {
+            flex: 1; position: relative; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+
+        .arena-center {
+            width: 180px; height: 180px; background: rgba(255,255,255,0.03);
+            border-radius: 50%; border: 2px dashed rgba(255,255,255,0.1);
+            display: flex; justify-content: center; align-items: center; gap: 15px;
+            position: relative;
+        }
+
+        /* اتجاه اللعب (دوران حول الأرينا) */
+        .play-direction {
+            position: absolute; width: 220px; height: 220px;
+            border: 2px solid transparent; border-top: 2px solid var(--uno-green);
+            border-radius: 50%; animation: rotate-cw 10s linear infinite;
+            pointer-events: none;
+        }
+        .play-direction.ccw { animation: rotate-ccw 10s linear infinite; border-top-color: var(--uno-red); }
+
+        @keyframes rotate-cw { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes rotate-ccw { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+
+        .deck-pile, .discard-pile {
+            width: 70px; height: 100px; border-radius: 8px; position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.3s;
+        }
+
+        .deck-pile { 
+            background: linear-gradient(135deg, #222 0%, #000 100%); 
+            border: 2px solid #444; cursor: pointer;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .deck-pile::before { content: "UNO"; font-weight: 900; color: #333; font-size: 0.8rem; }
+
+        .discard-pile { background: white; border: 2px solid #fff; }
+
+        /* --- 3. Players Layout (توزيع اللاعبين) --- */
+        .players-container {
+            position: absolute; inset: 0; pointer-events: none;
+        }
+
+        .player-seat {
+            position: absolute; width: 80px; display: flex; flex-direction: column;
+            align-items: center; pointer-events: auto; transition: all 0.5s ease;
+        }
+
+        /* التصميم الموحد لإطارات اللاعبين (نفس اللوبي) */
+        .avatar-wrap {
+            position: relative; width: 50px; height: 50px; border-radius: 50%;
+            padding: 2px; border: 2px solid #fff; background: #333;
+        }
+        .avatar-wrap img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        
+        .player-name {
+            background: rgba(0,0,0,0.8); padding: 2px 8px; border-radius: 5px;
+            font-size: 0.65rem; margin-top: -8px; z-index: 2; white-space: nowrap;
+            border: 1px solid transparent;
+        }
+
+        .card-count-badge {
+            position: absolute; top: -5px; right: -5px;
+            background: #ffaa00; color: black; font-weight: bold;
+            font-size: 0.7rem; width: 20px; height: 20px;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* تمييز الدور والتوهج */
+        .is-turn .avatar-wrap {
+            box-shadow: 0 0 15px #7ed321, 0 0 30px #7ed321;
+            border-color: #7ed321; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* تمييز "أنت" */
+        .is-me .player-name { border-color: #7ed321; color: #7ed321; font-weight: bold; }
+
+        /* --- 4. Your Hand (أسفل الشاشة) --- */
+        .bottom-controls {
+            height: 160px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
+            display: flex; flex-direction: column; align-items: center; 
+            padding: 10px; border-top: 1px solid #333; position: relative;
+        }
+
+        .my-hand {
+            width: 100%; display: flex; justify-content: center; align-items: flex-end;
+            height: 100px; gap: -20px; overflow-x: auto; padding: 10px;
+            scrollbar-width: none;
+        }
+        .my-hand::-webkit-scrollbar { display: none; }
+
+        .card {
+            min-width: 60px; height: 90px; border-radius: 8px; border: 2px solid white;
+            background: white; margin-left: -25px; cursor: pointer; transition: 0.2s;
+            box-shadow: -5px 0 10px rgba(0,0,0,0.3); position: relative;
+        }
+        .card:first-child { margin-left: 0; }
+        .card:hover { transform: translateY(-20px); z-index: 100 !important; }
+
+        .uno-btn {
+            position: absolute; right: 15px; top: -30px;
+            width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000);
+            border-radius: 50%; border: 3px solid #fff; color: white;
+            font-weight: 900; font-size: 0.7rem; display: flex;
+            justify-content: center; align-items: center; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s;
+        }
+        .uno-btn:active { transform: scale(0.9); }
+
+        /* --- 5. استايلات التدرجات لكل خانة (نفس اللوبي) --- */
+        .slot-0 .avatar-wrap { background: linear-gradient(135deg, #7b241c, #e74c3c); }
+        .slot-1 .avatar-wrap { background: linear-gradient(135deg, #154360, #3498db); }
+        .slot-2 .avatar-wrap { background: linear-gradient(135deg, #145a32, #2ecc71); }
+        .slot-3 .avatar-wrap { background: linear-gradient(135deg, #7e5109, #f1c40f); }
+        .slot-4 .avatar-wrap { background: linear-gradient(135deg, #6e2c00, #e67e22); }
+        .slot-5 .avatar-wrap { background: linear-gradient(135deg, #4a235a, #9b59b6); }
+        .slot-6 .avatar-wrap { background: linear-gradient(135deg, #641e16, #ec407a); }
+        .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); }
+        .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); }
+        .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
+
+    </style>
+</head>
+<body>
+
+<div class="mobile-wrapper">
+    <div class="top-bar">
+        <div class="top-left">
+            <div class="icon-circle">
+                <span id="playerCount" style="font-size:0.8rem;font-weight:bold;margin-left:2px;">0</span> 👤
+            </div> 
+            <div class="btn-pill" id="roomDisplay">🔗 الغرفة</div>
+        </div>
+        <div class="top-timer" id="gameTimer">00:30</div>
+        <div class="top-right">
+            <div class="btn-pill">📜القواعد</div>
+            <div class="icon-circle">⚙️</div>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="players-container" id="playersContainer">
+            </div>
+
+        <div class="arena-center">
+            <div class="play-direction" id="directionIndicator"></div>
+            <div class="deck-pile" id="deckPile"></div>
+            <div class="discard-pile" id="currentCard">
+                </div>
+        </div>
+    </div>
+
+    <div class="bottom-controls">
+        <div class="uno-btn">UNO!</div>
+        <div class="my-hand" id="myHand">
+            <div class="card" style="z-index:1; background-color: var(--uno-red);"></div>
+            <div class="card" style="z-index:2; background-color: var(--uno-blue);"></div>
+            <div class="card" style="z-index:3; background-color: var(--uno-green);"></div>
+            <div class="card" style="z-index:4; background-color: var(--uno-yellow);"></div>
+            <div class="card" style="z-index:5; background-color: var(--uno-red);"></div>
+            <div class="card" style="z-index:6; background-color: var(--uno-blue);"></div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+/* ---------- 1. Setup & Config ---------- */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, update, runTransaction, get, remove } 
+from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
+    authDomain: "uno-4ed20.firebaseapp.com",
+    databaseURL: "https://uno-4ed20-default-rtdb.firebaseio.com",
+    projectId: "uno-4ed20",
+    storageBucket: "uno-4ed20.firebasestorage.app",
+    messagingSenderId: "246636486248",
+    appId: "1:246636486248:web:aaab01dccbb45dd9b665dd",
+    measurementId: "G-N34ZFTMQZT"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const urlParams = new URLSearchParams(window.location.search);
+const roomId = urlParams.get('r');
+const playerId = localStorage.getItem('uno_playerId');
+
+if (!roomId || !playerId) window.location.href = 'index.html';
+
+const roomRef = ref(db, `rooms/${roomId}`);
+const gameRef = ref(db, `rooms/${roomId}/game`);
+const playersRef = ref(db, `rooms/${roomId}/players`);
+
+/* ---------- 2. Game State Variables ---------- */
+let gameState = null;
+let myInfo = null;
+let allPlayers = [];
+let localTimer = null;
+
+/* ---------- 3. Card Engine (المنطق الذي طلبته) ---------- */
+const COLORS = ['red', 'blue', 'green', 'yellow'];
+const TYPES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
+const WILD_TYPES = ['wild', 'draw4'];
+
+function createUnoDeck(numDecks, hasEraser) {
+    let deck = [];
+    for (let d = 0; d < numDecks; d++) {
+        COLORS.forEach(color => {
+            TYPES.forEach(type => {
+                let count = (type === '0') ? 1 : 2;
+                for (let i = 0; i < count; i++) deck.push({ id: Math.random().toString(36).substr(2, 9), color, type });
+            });
+        });
+        for (let i = 0; i < 4; i++) {
+            deck.push({ id: Math.random().toString(36).substr(2, 9), color: 'wild', type: 'wild' });
+            deck.push({ id: Math.random().toString(36).substr(2, 9), color: 'wild', type: 'draw4' });
+        }
+        if (hasEraser) {
+            deck.push({ id: 'eraser-' + d, color: 'special', type: 'eraser' });
+        }
+    }
+    return shuffle(deck);
+}
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+/* ---------- 4. UI Rendering ---------- */
+
+// توزيع اللاعبين ديناميكياً
+function layoutPlayers(playersList) {
+    const container = document.getElementById('playersContainer');
+    container.innerHTML = '';
+    
+    // استبعاد "أنا" من المصفوفة لأنني سأكون بالأسفل
+    const others = playersList.filter(p => p.id !== playerId);
+    const totalOthers = others.length;
+
+    const configs = {
+        1: { right: 0, top: 1, left: 0 },
+        2: { right: 1, top: 0, left: 1 },
+        3: { right: 1, top: 1, left: 1 },
+        4: { right: 2, top: 0, left: 2 },
+        5: { right: 2, top: 1, left: 2 },
+        6: { right: 2, top: 2, left: 2 },
+        7: { right: 2, top: 3, left: 2 },
+        8: { right: 3, top: 2, left: 3 },
+        9: { right: 3, top: 3, left: 3 }
+    };
+
+    const config = configs[totalOthers] || { right: 0, top: 1, left: 0 };
+    let positions = [];
+
+    for (let i = 0; i < config.right; i++) positions.push({ side: 'right', top: (100 / (config.right + 1)) * (i + 1) });
+    for (let i = 0; i < config.top; i++) positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) });
+    for (let i = 0; i < config.left; i++) positions.push({ side: 'left', top: (100 / (config.left + 1)) * (i + 1) });
+
+    others.forEach((player, idx) => {
+        const pos = positions[idx];
+        const isCurrentTurn = gameState.currentTurn === player.id;
+        const seat = document.createElement('div');
+        seat.className = `player-seat ${player.slot} ${isCurrentTurn ? 'is-turn' : ''}`;
+        
+        let style = "";
+        if (pos.side === 'right') style = `top: ${pos.top}%; right: 15px; transform: translateY(-50%);`;
+        if (pos.side === 'left') style = `top: ${pos.top}%; left: 15px; transform: translateY(-50%);`;
+        if (pos.side === 'top') style = `top: 20px; left: ${pos.left}%; transform: translateX(-50%);`;
+        seat.style.cssText = style;
+
+        seat.innerHTML = `
+            <div class="avatar-wrap">
+                <img src="${player.avatar}">
+                <div class="card-count-badge">${player.cardCount || 0}</div>
+                ${player.saidUno ? '<div style="position:absolute; bottom:-10px; background:red; font-size:10px; padding:2px; border-radius:4px;">UNO!</div>' : ''}
+            </div>
+            <div class="player-name">${player.name}</div>
+        `;
+        container.appendChild(seat);
+    });
+}
+
+function renderMyHand(hand) {
+    const handDiv = document.getElementById('myHand');
+    handDiv.innerHTML = '';
+    hand.forEach((card, idx) => {
+        const cardEl = document.createElement('div');
+        cardEl.className = 'card';
+        cardEl.style.cssText = `z-index:${idx}; background-color: var(--uno-${card.color});`;
+        cardEl.innerHTML = `<span style="color:white; font-weight:bold;">${card.type}</span>`;
+        cardEl.onclick = () => tryPlayCard(card);
+        handDiv.appendChild(cardEl);
+    });
+}
+
+function renderArena(game) {
+    const discard = game.discardPile[game.discardPile.length - 1];
+    const currentCardDiv = document.getElementById('currentCard');
+    currentCardDiv.style.backgroundColor = `var(--uno-${discard.color})`;
+    currentCardDiv.innerHTML = `<span style="color:white; font-size:2rem; font-weight:bold;">${discard.type}</span>`;
+    
+    // تحديث الاتجاه
+    const indicator = document.getElementById('directionIndicator');
+    indicator.className = game.direction === 1 ? 'play-direction' : 'play-direction ccw';
+}
+
+/* ---------- 5. Game Logic (Firebase actions) ---------- */
+
+// دالة البدء (يتم استدعاؤها من قبل الآدمن فقط في أول دخول)
+async function initGame(roomData) {
+    if (roomData.status === "started" && !roomData.game) {
+        const playersArray = Object.values(roomData.players).filter(p => p.slot.startsWith('slot-'));
+        const deck = createUnoDeck(roomData.settings.decks, roomData.settings.eraser);
+        
+        // توزيع البطاقات
+        let hands = {};
+        playersArray.forEach(p => {
+            hands[p.id] = deck.splice(0, roomData.settings.cards);
+        });
+
+        const firstCard = deck.splice(0, 1)[0];
+
+        const initialGame = {
+            deck: deck,
+            discardPile: [firstCard],
+            currentTurn: playersArray[0].id,
+            direction: 1, // 1 = clockwise, -1 = ccw
+            stackCount: 0,
+            status: "playing",
+            turnStartTime: Date.now()
+        };
+
+        // تحديث كل الأيدي في الفايربيس
+        for(let id in hands) {
+            await set(ref(db, `rooms/${roomId}/hands/${id}`), hands[id]);
+        }
+        await update(gameRef, initialGame);
+    }
+}
+
+async function tryPlayCard(card) {
+    if (gameState.currentTurn !== playerId) return alert("ليس دورك!");
+    
+    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+    const canPlay = card.color === topCard.color || card.type === topCard.type || card.color === 'wild';
+    
+    if (canPlay) {
+        // منطق لعب الكرت (تحديث الفايربيس)
+        // سيتم معالجة "السحب" و "العكس" هنا في التحديث القادم
+    }
+}
+
+/* ---------- 6. Listeners ---------- */
+
+onValue(roomRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    // 1. تحديث التوب بار
+    document.getElementById('playerCount').innerText = Object.keys(data.players).length;
+    document.getElementById('roomDisplay').innerText = "🔗 " + roomId;
+
+    // 2. إذا لم يتم إنشاء اللعبة بعد، الآدمن ينشئها
+    const adminId = Object.values(data.players).sort((a,b) => a.joinedAt - b.joinedAt)[0].id;
+    if (playerId === adminId && !data.game) {
+        initGame(data);
+    }
+
+    if (data.game) {
+        gameState = data.game;
+        allPlayers = Object.values(data.players).filter(p => p.slot.startsWith('slot-'));
+        
+        // إضافة عدد البطاقات لكل لاعب
+        allPlayers.forEach(p => {
+            if (data.hands && data.hands[p.id]) {
+                p.cardCount = data.hands[p.id].length;
+            }
+        });
+
+        layoutPlayers(allPlayers);
+        renderArena(data.game);
+        
+        // جلب يدي أنا من مسار منفصل للحماية
+        get(ref(db, `rooms/${roomId}/hands/${playerId}`)).then(handSnap => {
+            if (handSnap.exists()) renderMyHand(handSnap.val());
+        });
+
+        // تمييز "أنت" في التوب بار أو الواجهة
+        document.querySelector('.top-bar').style.borderBottom = (gameState.currentTurn === playerId) ? "3px solid #7ed321" : "none";
+    }
+});
+
+/* ---------- 7. Timer logic ---------- */
+function startTimer(seconds) {
+    if (seconds === 0) return; // بدون مؤقت
+    clearInterval(localTimer);
+    let timeLeft = seconds;
+    localTimer = setInterval(() => {
+        timeLeft--;
+        document.getElementById('gameTimer').innerText = `00:${timeLeft < 10 ? '0' : ''}${timeLeft}`;
+        if (timeLeft <= 0) {
+            clearInterval(localTimer);
+            if (gameState.currentTurn === playerId) {
+                // دالة السحب التلقائي وتخطي الدور
+            }
+        }
+    }, 1000);
+}
+
+</script>
