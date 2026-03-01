@@ -137,19 +137,45 @@
 
         .my-hand {
             width: 100%; display: flex; justify-content: center; align-items: flex-end;
-            height: 100px; gap: -20px; overflow-x: auto; padding: 10px;
+            height: 90%; gap: -20px; overflow-x: auto; padding: 10px;
             scrollbar-width: none;
         }
         .my-hand::-webkit-scrollbar { display: none; }
 
-        .card {
-            min-width: 60px; height: 90px; border-radius: 8px; border: 2px solid white;
-            background: white; margin-left: -25px; cursor: pointer; transition: 0.2s;
-            box-shadow: -5px 0 10px rgba(0,0,0,0.3); position: relative;
-        }
-        .card:first-child { margin-left: 0; }
-        .card:hover { transform: translateY(-20px); z-index: 100 !important; }
+/* تحديث استايل الكارت الأساسي */
+.card {
+    min-width: 65px; height: 95px; border-radius: 8px; 
+    border: 3px solid #e0e0e0; position: relative;
+    display: flex; justify-content: center; align-items: center;
+    box-shadow: -3px 0 10px rgba(0,0,0,0.5); transition: 0.2s;
+    cursor: pointer; overflow: hidden; margin-left: -25px;
+}
 
+/* العناصر الداخلية للبطاقة */
+.inner-oval {
+    width: 115%; height: 75%; background-color: white;
+    border-radius: 50%; transform: rotate(-45deg);
+    position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1;
+}
+.symbol { font-weight: bold; transform: rotate(45deg); z-index: 2; font-size: 35px; }
+.corner-number { position: absolute; font-size: 10px; font-weight: bold; color: white; z-index: 2; }
+.top-left { top: 2px; left: 2px; }
+.bottom-right { bottom: 2px; right: 2px;}
+
+/* ألوان البطاقات */
+.red { background-color: #ff5555; } .red .symbol { color: #ff5555; }
+.blue { background-color: #5555ff; } .blue .symbol { color: #5555ff; }
+.yellow { background-color: #ffaa00; } .yellow .symbol { color: #ffaa00; }
+.green { background-color: #55aa55; } .green .symbol { color: #55aa55; }
+.wild { background-color: #111; }
+.wild .inner-oval { background: linear-gradient(45deg, #ff5555 25%, #5555ff 25%, #5555ff 50%, #ffaa00 50%, #ffaa00 75%, #55aa55 75%); }
+.wild .symbol { color: white; font-size: 18px; }
+
+.card:hover { transform: translateY(-20px); z-index: 100 !important; }
+#currentCard .card:hover { 
+    transform: none !important; 
+    z-index: 1 !important; /* أو أي قيمة تناسب تنسيقك */
+}
         .uno-btn {
             position: absolute; right: 15px; top: -30px;
             width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000);
@@ -184,7 +210,7 @@
             </div> 
             <div class="btn-pill" id="roomDisplay">🔗 الغرفة</div>
         </div>
-        <div class="top-timer" id="gameTimer">00:30</div>
+        <div class="top-timer" id="gameTimer"></div>
         <div class="top-right">
             <div class="btn-pill">📜القواعد</div>
             <div class="icon-circle">⚙️</div>
@@ -199,81 +225,119 @@
             <div class="play-direction" id="directionIndicator"></div>
             <div class="deck-pile" id="deckPile"></div>
             <div class="discard-pile" id="currentCard">
+                <div class="card green" style="margin:0; width:100%; height:100%; border-width:3px;">
+                    <div class="corner-number top-left">7</div>
+                    <div class="inner-oval"><span class="symbol">7</span></div>
+                    <div class="corner-number bottom-right">7</div>
                 </div>
+            </div>
         </div>
     </div>
 
     <div class="bottom-controls">
         <div class="uno-btn">UNO!</div>
         <div class="my-hand" id="myHand">
-            <div class="card" style="z-index:1; background-color: var(--uno-red);"></div>
-            <div class="card" style="z-index:2; background-color: var(--uno-blue);"></div>
-            <div class="card" style="z-index:3; background-color: var(--uno-green);"></div>
-            <div class="card" style="z-index:4; background-color: var(--uno-yellow);"></div>
-            <div class="card" style="z-index:5; background-color: var(--uno-red);"></div>
-            <div class="card" style="z-index:6; background-color: var(--uno-blue);"></div>
+            <div class="card red" style="z-index:1">
+                <div class="corner-number top-left">5</div>
+                <div class="inner-oval"><span class="symbol">5</span></div>
+                <div class="corner-number bottom-right">5</div>
+            </div>
+            <div class="card blue" style="z-index:2">
+                <div class="corner-number top-left">⊘</div>
+                <div class="inner-oval"><span class="symbol">⊘</span></div>
+                <div class="corner-number bottom-right">⊘</div>
+            </div>
+            <div class="card yellow" style="z-index:3">
+                <div class="corner-number top-left">+2</div>
+                <div class="inner-oval"><span class="symbol" style="font-size:25px">+2</span></div>
+                <div class="corner-number bottom-right">+2</div>
+            </div>
+            <div class="card green" style="z-index:4">
+                <div class="corner-number top-left">↻</div>
+                <div class="inner-oval"><span class="symbol">↻</span></div>
+                <div class="corner-number bottom-right">↻</div>
+            </div>
+            <div class="card wild" style="z-index:5">
+                <div class="corner-number top-left">C</div>
+                <div class="inner-oval"><span class="symbol">Color</span></div>
+                <div class="corner-number bottom-right">C</div>
+            </div>
+            <div class="card wild" style="z-index:6">
+                <div class="corner-number top-left">+4</div>
+                <div class="inner-oval"><span class="symbol">+4</span></div>
+                <div class="corner-number bottom-right">+4</div>
+            </div>
+            <div class="card" style="z-index:7; background-color: #ffffff; border-color: #dcdcdc;"></div>
         </div>
     </div>
 </div>
 
-<script type="module">
-/* ---------- 1. Setup & Config ---------- */
+<script>
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, update, runTransaction, get, remove } 
+import { getDatabase, ref, onValue, update, get, runTransaction } 
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+
+/* ---------------- Firebase ---------------- */
 
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
     authDomain: "uno-4ed20.firebaseapp.com",
     databaseURL: "https://uno-4ed20-default-rtdb.firebaseio.com",
     projectId: "uno-4ed20",
-    storageBucket: "uno-4ed20.firebasestorage.app",
-    messagingSenderId: "246636486248",
-    appId: "1:246636486248:web:aaab01dccbb45dd9b665dd",
-    measurementId: "G-N34ZFTMQZT"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const urlParams = new URLSearchParams(window.location.search);
-const roomId = urlParams.get('r');
-const playerId = localStorage.getItem('uno_playerId');
+/* ---------------- Room Data ---------------- */
 
-if (!roomId || !playerId) window.location.href = 'index.html';
+const urlParams = new URLSearchParams(window.location.search);
+const roomId = urlParams.get("r");
+const playerId = urlParams.get("p");
 
 const roomRef = ref(db, `rooms/${roomId}`);
 const gameRef = ref(db, `rooms/${roomId}/game`);
 const playersRef = ref(db, `rooms/${roomId}/players`);
+const settingsRef = ref(db, `rooms/${roomId}/settings`);
 
-/* ---------- 2. Game State Variables ---------- */
-let gameState = null;
-let myInfo = null;
-let allPlayers = [];
-let localTimer = null;
+/* ---------------- Game State ---------------- */
 
-/* ---------- 3. Card Engine (المنطق الذي طلبته) ---------- */
-const COLORS = ['red', 'blue', 'green', 'yellow'];
-const TYPES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
-const WILD_TYPES = ['wild', 'draw4'];
+let localGameState = null;
+let localSettings = null;
+let playersCache = {};
+let isAdmin = false;
+let timerInterval = null;
 
-function createUnoDeck(numDecks, hasEraser) {
+/* ---------------- Card Engine ---------------- */
+
+const colors = ["red", "blue", "green", "yellow"];
+
+function createDeck(deckCount, eraserEnabled) {
     let deck = [];
-    for (let d = 0; d < numDecks; d++) {
-        COLORS.forEach(color => {
-            TYPES.forEach(type => {
-                let count = (type === '0') ? 1 : 2;
-                for (let i = 0; i < count; i++) deck.push({ id: Math.random().toString(36).substr(2, 9), color, type });
+
+    for (let d = 0; d < deckCount; d++) {
+        colors.forEach(color => {
+            deck.push({ type: "number", value: 0, color });
+            for (let i = 1; i <= 9; i++) {
+                deck.push({ type: "number", value: i, color });
+                deck.push({ type: "number", value: i, color });
+            }
+            ["skip", "reverse", "draw2"].forEach(type => {
+                deck.push({ type, color });
+                deck.push({ type, color });
             });
         });
+
         for (let i = 0; i < 4; i++) {
-            deck.push({ id: Math.random().toString(36).substr(2, 9), color: 'wild', type: 'wild' });
-            deck.push({ id: Math.random().toString(36).substr(2, 9), color: 'wild', type: 'draw4' });
+            deck.push({ type: "wild" });
+            deck.push({ type: "wild4" });
         }
-        if (hasEraser) {
-            deck.push({ id: 'eraser-' + d, color: 'special', type: 'eraser' });
+
+        if (eraserEnabled) {
+            deck.push({ type: "eraser" });
         }
     }
+
     return shuffle(deck);
 }
 
@@ -285,185 +349,208 @@ function shuffle(array) {
     return array;
 }
 
-/* ---------- 4. UI Rendering ---------- */
+/* ---------------- Start Game (Admin Only) ---------------- */
 
-// توزيع اللاعبين ديناميكياً
-function layoutPlayers(playersList) {
-    const container = document.getElementById('playersContainer');
-    container.innerHTML = '';
-    
-    // استبعاد "أنا" من المصفوفة لأنني سأكون بالأسفل
-    const others = playersList.filter(p => p.id !== playerId);
-    const totalOthers = others.length;
+async function initializeGame() {
+    const playersSnap = await get(playersRef);
+    const settingsSnap = await get(settingsRef);
 
-    const configs = {
-        1: { right: 0, top: 1, left: 0 },
-        2: { right: 1, top: 0, left: 1 },
-        3: { right: 1, top: 1, left: 1 },
-        4: { right: 2, top: 0, left: 2 },
-        5: { right: 2, top: 1, left: 2 },
-        6: { right: 2, top: 2, left: 2 },
-        7: { right: 2, top: 3, left: 2 },
-        8: { right: 3, top: 2, left: 3 },
-        9: { right: 3, top: 3, left: 3 }
+    const players = Object.values(playersSnap.val())
+        .filter(p => p.slot.startsWith("slot-"))
+        .sort((a, b) => a.slot.localeCompare(b.slot));
+
+    const settings = settingsSnap.val();
+    localSettings = settings;
+
+    const deck = createDeck(settings.decks, settings.eraser);
+
+    let hands = {};
+    players.forEach(p => hands[p.id] = []);
+
+    for (let i = 0; i < settings.cards; i++) {
+        players.forEach(p => {
+            hands[p.id].push(deck.pop());
+        });
+    }
+
+    const firstCard = deck.pop();
+
+    const gameState = {
+        players: players.map(p => p.id),
+        hands,
+        deck,
+        discard: [firstCard],
+        currentPlayerIndex: Math.floor(Math.random() * players.length),
+        direction: 1,
+        stackingValue: 0,
+        unoPlayers: {},
+        finishedPlayers: [],
+        startedAt: Date.now()
     };
 
-    const config = configs[totalOthers] || { right: 0, top: 1, left: 0 };
-    let positions = [];
-
-    for (let i = 0; i < config.right; i++) positions.push({ side: 'right', top: (100 / (config.right + 1)) * (i + 1) });
-    for (let i = 0; i < config.top; i++) positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) });
-    for (let i = 0; i < config.left; i++) positions.push({ side: 'left', top: (100 / (config.left + 1)) * (i + 1) });
-
-    others.forEach((player, idx) => {
-        const pos = positions[idx];
-        const isCurrentTurn = gameState.currentTurn === player.id;
-        const seat = document.createElement('div');
-        seat.className = `player-seat ${player.slot} ${isCurrentTurn ? 'is-turn' : ''}`;
-        
-        let style = "";
-        if (pos.side === 'right') style = `top: ${pos.top}%; right: 15px; transform: translateY(-50%);`;
-        if (pos.side === 'left') style = `top: ${pos.top}%; left: 15px; transform: translateY(-50%);`;
-        if (pos.side === 'top') style = `top: 20px; left: ${pos.left}%; transform: translateX(-50%);`;
-        seat.style.cssText = style;
-
-        seat.innerHTML = `
-            <div class="avatar-wrap">
-                <img src="${player.avatar}">
-                <div class="card-count-badge">${player.cardCount || 0}</div>
-                ${player.saidUno ? '<div style="position:absolute; bottom:-10px; background:red; font-size:10px; padding:2px; border-radius:4px;">UNO!</div>' : ''}
-            </div>
-            <div class="player-name">${player.name}</div>
-        `;
-        container.appendChild(seat);
-    });
+    await update(roomRef, { game: gameState });
 }
 
-function renderMyHand(hand) {
-    const handDiv = document.getElementById('myHand');
-    handDiv.innerHTML = '';
-    hand.forEach((card, idx) => {
-        const cardEl = document.createElement('div');
-        cardEl.className = 'card';
-        cardEl.style.cssText = `z-index:${idx}; background-color: var(--uno-${card.color});`;
-        cardEl.innerHTML = `<span style="color:white; font-weight:bold;">${card.type}</span>`;
-        cardEl.onclick = () => tryPlayCard(card);
-        handDiv.appendChild(cardEl);
-    });
+/* ---------------- Turn Logic ---------------- */
+
+function getCurrentPlayerId() {
+    return localGameState.players[localGameState.currentPlayerIndex];
 }
 
-function renderArena(game) {
-    const discard = game.discardPile[game.discardPile.length - 1];
-    const currentCardDiv = document.getElementById('currentCard');
-    currentCardDiv.style.backgroundColor = `var(--uno-${discard.color})`;
-    currentCardDiv.innerHTML = `<span style="color:white; font-size:2rem; font-weight:bold;">${discard.type}</span>`;
-    
-    // تحديث الاتجاه
-    const indicator = document.getElementById('directionIndicator');
-    indicator.className = game.direction === 1 ? 'play-direction' : 'play-direction ccw';
+function nextTurn() {
+    let length = localGameState.players.length;
+    localGameState.currentPlayerIndex =
+        (localGameState.currentPlayerIndex + localGameState.direction + length) % length;
 }
 
-/* ---------- 5. Game Logic (Firebase actions) ---------- */
+/* ---------------- Play Card ---------------- */
 
-// دالة البدء (يتم استدعاؤها من قبل الآدمن فقط في أول دخول)
-async function initGame(roomData) {
-    if (roomData.status === "started" && !roomData.game) {
-        const playersArray = Object.values(roomData.players).filter(p => p.slot.startsWith('slot-'));
-        const deck = createUnoDeck(roomData.settings.decks, roomData.settings.eraser);
-        
-        // توزيع البطاقات
-        let hands = {};
-        playersArray.forEach(p => {
-            hands[p.id] = deck.splice(0, roomData.settings.cards);
-        });
+window.playCard = async function(cardIndex) {
+    if (!localGameState) return;
+    if (getCurrentPlayerId() !== playerId) return;
 
-        const firstCard = deck.splice(0, 1)[0];
+    runTransaction(gameRef, (game) => {
+        if (!game) return;
 
-        const initialGame = {
-            deck: deck,
-            discardPile: [firstCard],
-            currentTurn: playersArray[0].id,
-            direction: 1, // 1 = clockwise, -1 = ccw
-            stackCount: 0,
-            status: "playing",
-            turnStartTime: Date.now()
-        };
+        let hand = game.hands[playerId];
+        const card = hand[cardIndex];
+        const topCard = game.discard[game.discard.length - 1];
 
-        // تحديث كل الأيدي في الفايربيس
-        for(let id in hands) {
-            await set(ref(db, `rooms/${roomId}/hands/${id}`), hands[id]);
+        if (!isValidMove(card, topCard, game.stackingValue)) return;
+
+        hand.splice(cardIndex, 1);
+        game.discard.push(card);
+
+        applyEffect(game, card);
+
+        if (hand.length === 1) {
+            game.unoPlayers[playerId] = true;
         }
-        await update(gameRef, initialGame);
+
+        if (hand.length === 0) {
+            game.finishedPlayers.push(playerId);
+        }
+
+        nextTurnGame(game);
+        return game;
+    });
+};
+
+function isValidMove(card, topCard, stackingValue) {
+    if (stackingValue > 0) {
+        return card.type === "draw2" || card.type === "wild4";
+    }
+    if (card.type === "wild" || card.type === "wild4") return true;
+    if (card.color && card.color === topCard.color) return true;
+    if (card.value !== undefined && card.value === topCard.value) return true;
+    if (card.type === topCard.type) return true;
+    return false;
+}
+
+function applyEffect(game, card) {
+    if (card.type === "reverse") {
+        game.direction *= -1;
+    }
+    if (card.type === "skip") {
+        nextTurnGame(game);
+    }
+    if (card.type === "draw2") {
+        game.stackingValue += 2;
+    }
+    if (card.type === "wild4") {
+        game.stackingValue += 4;
     }
 }
 
-async function tryPlayCard(card) {
-    if (gameState.currentTurn !== playerId) return alert("ليس دورك!");
-    
-    const topCard = gameState.discardPile[gameState.discardPile.length - 1];
-    const canPlay = card.color === topCard.color || card.type === topCard.type || card.color === 'wild';
-    
-    if (canPlay) {
-        // منطق لعب الكرت (تحديث الفايربيس)
-        // سيتم معالجة "السحب" و "العكس" هنا في التحديث القادم
+function nextTurnGame(game) {
+    let length = game.players.length;
+    game.currentPlayerIndex =
+        (game.currentPlayerIndex + game.direction + length) % length;
+}
+
+/* ---------------- Draw Card ---------------- */
+
+window.drawCard = async function() {
+    runTransaction(gameRef, (game) => {
+        if (!game) return;
+        if (getCurrentPlayerId() !== playerId) return;
+
+        if (game.deck.length === 0) {
+            let top = game.discard.pop();
+            game.deck = shuffle(game.discard);
+            game.discard = [top];
+        }
+
+        let drawCount = game.stackingValue > 0 ? game.stackingValue : 1;
+
+        for (let i = 0; i < drawCount; i++) {
+            game.hands[playerId].push(game.deck.pop());
+        }
+
+        game.stackingValue = 0;
+        nextTurnGame(game);
+        return game;
+    });
+};
+
+/* ---------------- UNO Button ---------------- */
+
+document.querySelector(".uno-btn").onclick = () => {
+    runTransaction(gameRef, (game) => {
+        if (!game) return;
+        game.unoPlayers[playerId] = true;
+        return game;
+    });
+};
+
+/* ---------------- Rendering ---------------- */
+
+function renderGame(game) {
+    const myHand = document.getElementById("myHand");
+    myHand.innerHTML = "";
+
+    game.hands[playerId].forEach((card, i) => {
+        const div = document.createElement("div");
+        div.className = `card ${card.color || 'wild'}`;
+        div.onclick = () => playCard(i);
+        myHand.appendChild(div);
+    });
+
+    document.getElementById("directionIndicator").innerText =
+        game.direction === 1 ? "↻" : "↺";
+
+    highlightCurrentPlayer(game);
+}
+
+function highlightCurrentPlayer(game) {
+    const currentId = game.players[game.currentPlayerIndex];
+    document.querySelectorAll(".player-seat").forEach(seat => {
+        seat.classList.remove("active-turn");
+    });
+    if (currentId !== playerId) {
+        const index = game.players.indexOf(currentId);
+        const seat = document.querySelector(`.slot-${index+1}`);
+        if (seat) seat.classList.add("active-turn");
     }
 }
 
-/* ---------- 6. Listeners ---------- */
+/* ---------------- Listeners ---------------- */
 
-onValue(roomRef, (snapshot) => {
-    const data = snapshot.val();
-    if (!data) return;
-
-    // 1. تحديث التوب بار
-    document.getElementById('playerCount').innerText = Object.keys(data.players).length;
-    document.getElementById('roomDisplay').innerText = "🔗 " + roomId;
-
-    // 2. إذا لم يتم إنشاء اللعبة بعد، الآدمن ينشئها
-    const adminId = Object.values(data.players).sort((a,b) => a.joinedAt - b.joinedAt)[0].id;
-    if (playerId === adminId && !data.game) {
-        initGame(data);
-    }
-
-    if (data.game) {
-        gameState = data.game;
-        allPlayers = Object.values(data.players).filter(p => p.slot.startsWith('slot-'));
-        
-        // إضافة عدد البطاقات لكل لاعب
-        allPlayers.forEach(p => {
-            if (data.hands && data.hands[p.id]) {
-                p.cardCount = data.hands[p.id].length;
-            }
-        });
-
-        layoutPlayers(allPlayers);
-        renderArena(data.game);
-        
-        // جلب يدي أنا من مسار منفصل للحماية
-        get(ref(db, `rooms/${roomId}/hands/${playerId}`)).then(handSnap => {
-            if (handSnap.exists()) renderMyHand(handSnap.val());
-        });
-
-        // تمييز "أنت" في التوب بار أو الواجهة
-        document.querySelector('.top-bar').style.borderBottom = (gameState.currentTurn === playerId) ? "3px solid #7ed321" : "none";
-    }
+onValue(playersRef, (snap) => {
+    playersCache = snap.val() || {};
+    const sorted = Object.values(playersCache).sort((a,b)=>a.joinedAt-b.joinedAt);
+    isAdmin = sorted[0]?.id === playerId;
 });
 
-/* ---------- 7. Timer logic ---------- */
-function startTimer(seconds) {
-    if (seconds === 0) return; // بدون مؤقت
-    clearInterval(localTimer);
-    let timeLeft = seconds;
-    localTimer = setInterval(() => {
-        timeLeft--;
-        document.getElementById('gameTimer').innerText = `00:${timeLeft < 10 ? '0' : ''}${timeLeft}`;
-        if (timeLeft <= 0) {
-            clearInterval(localTimer);
-            if (gameState.currentTurn === playerId) {
-                // دالة السحب التلقائي وتخطي الدور
-            }
-        }
-    }, 1000);
-}
-
+onValue(gameRef, (snap) => {
+    if (!snap.exists()) {
+        if (isAdmin) initializeGame();
+        return;
+    }
+    localGameState = snap.val();
+    renderGame(localGameState);
+});
 </script>
+
+</body>
+</html>
