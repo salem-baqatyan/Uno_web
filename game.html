@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>UNO! Pro - Playing</title>
     <style>
-        /* --- الأساسيات (مأخوذة من اللوبي لضمان التطابق) --- */
+        /* --- الأساسيات --- */
         :root {
             --bg-dark: #000000;
             --arena-bg: #111111;
@@ -29,7 +29,7 @@
             display: flex; flex-direction: column; position: relative; overflow: hidden;
         }
 
-        /* --- 1. App Bar (نفس اللوبي بالضبط) --- */
+        /* --- 1. App Bar --- */
         .top-bar { 
             display: flex; justify-content: space-between; align-items: center; 
             padding: 10px 15px; flex-shrink: 0; z-index: 100;
@@ -48,7 +48,7 @@
             border-radius: 20px; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: white; 
         }
 
-        /* --- 2. Arena (المركز) --- */
+        /* --- 2. Arena --- */
         .game-area {
             flex: 1; position: relative; display: flex; flex-direction: column;
             justify-content: center; align-items: center; padding: 20px;
@@ -61,14 +61,13 @@
             position: relative;
         }
 
-        /* اتجاه اللعب (دوران حول الأرينا) */
         .play-direction {
             position: absolute; width: 220px; height: 220px;
             border: 2px solid transparent; border-top: 2px solid white;
             border-radius: 50%; animation: rotate-cw 10s linear infinite;
             pointer-events: none;
         }
-        .play-direction.ccw { animation: rotate-ccw 10s linear infinite; border-top-color: var(--uno-red); }
+        .play-direction.ccw { animation: rotate-ccw 10s linear infinite; }
 
         @keyframes rotate-cw { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes rotate-ccw { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
@@ -85,31 +84,24 @@
         }
         .deck-pile::before { content: "UNO"; font-weight: 900; color: #333; font-size: 0.8rem; }
 
-        .discard-pile { background: white; border: 2px solid #fff; }
+        .discard-pile { background: white; border: 2px solid #fff; overflow: hidden; }
 
-        /* --- 3. Players Layout (توزيع اللاعبين) --- */
-        .players-container {
-            position: absolute; inset: 0; pointer-events: none;
-        }
-
+        /* --- 3. Players Layout --- */
+        .players-container { position: absolute; inset: 0; pointer-events: none; }
         .player-seat {
             position: absolute; width: 80px; display: flex; flex-direction: column;
             align-items: center; pointer-events: auto; transition: all 0.5s ease;
         }
-
-        /* التصميم الموحد لإطارات اللاعبين (نفس اللوبي) */
         .avatar-wrap {
             position: relative; width: 50px; height: 50px; border-radius: 50%;
-            padding: 2px; border: 2px solid #fff; background: #333;
+            padding: 2px; border: 2px solid #fff; background: #333; z-index: 2;
         }
         .avatar-wrap img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-        
         .player-name {
-            background: rgba(0,0,0,0.8); padding: 2px 8px; border-radius: 5px;
-            font-size: 0.65rem; margin-top: -8px; z-index: 2; white-space: nowrap;
-            border: 1px solid transparent;
+            background: rgba(0,0,0,0.9); padding: 2px 10px; border-radius: 5px;
+            font-size: 0.65rem; margin-top: -5px; z-index: 3; white-space: nowrap;
+            border: 1px solid #ffffff; color: white;
         }
-
         .card-count-badge {
             position: absolute; top: -5px; right: -5px;
             background: #ffaa00; color: black; font-weight: bold;
@@ -117,18 +109,10 @@
             border-radius: 50%; display: flex; justify-content: center; align-items: center;
             box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
+        .player-seat.is-turn { filter: drop-shadow(0 0 10px #7ed321) drop-shadow(0 0 5px #7ed321); z-index: 100; }
+        .player-seat.is-me .player-name { color: #7ed321; font-weight: bold; }
 
-        /* تمييز الدور والتوهج */
-        .is-turn .avatar-wrap {
-            box-shadow: 0 0 15px #7ed321, 0 0 30px #7ed321;
-            border-color: #7ed321; animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
-        /* تمييز "أنت" */
-        .is-me .player-name { border-color: #7ed321; color: #7ed321; font-weight: bold; }
-
-        /* --- 4. Your Hand (أسفل الشاشة) --- */
+        /* --- 4. Your Hand & Color Picker --- */
         .bottom-controls {
             height: 160px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
             display: flex; flex-direction: column; align-items: center; 
@@ -137,45 +121,54 @@
 
         .my-hand {
             width: 100%; display: flex; justify-content: center; align-items: flex-end;
-            height: 90%; gap: -20px; overflow-x: auto; padding: 10px;
-            scrollbar-width: none;
+            height: 90%; gap: -20px; overflow-x: auto; padding: 10px; scrollbar-width: none;
         }
         .my-hand::-webkit-scrollbar { display: none; }
 
-/* تحديث استايل الكارت الأساسي */
-.card {
-    min-width: 65px; height: 95px; border-radius: 8px; 
-    border: 3px solid #e0e0e0; position: relative;
-    display: flex; justify-content: center; align-items: center;
-    box-shadow: -3px 0 10px rgba(0,0,0,0.5); transition: 0.2s;
-    cursor: pointer; overflow: hidden; margin-left: -25px;
-}
+        /* تصميم اختيار الألوان المطور */
+        #colorPicker {
+            position: absolute; top: -70px; background: rgba(0,0,0,0.9);
+            padding: 10px 20px; border-radius: 15px; border: 1px solid #444;
+            display: none; gap: 10px; z-index: 1000; box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+        }
+        .color-btn {
+            width: 45px; height: 45px; border-radius: 10px; border: 2px solid white;
+            cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .color-btn:active { transform: scale(0.9); }
 
-/* العناصر الداخلية للبطاقة */
-.inner-oval {
-    width: 115%; height: 75%; background-color: white;
-    border-radius: 50%; transform: rotate(-45deg);
-    position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1;
-}
-.symbol { font-weight: bold; transform: rotate(45deg); z-index: 2; font-size: 35px; }
-.corner-number { position: absolute; font-size: 10px; font-weight: bold; color: white; z-index: 2; }
-.top-left { top: 2px; left: 2px; }
-.bottom-right { bottom: 2px; right: 2px;}
+        /* --- 5. البطاقات --- */
+        .card {
+            min-width: 65px; width: 65px; height: 95px; border-radius: 8px; 
+            border: 3px solid #e0e0e0; position: relative;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: -3px 0 10px rgba(0,0,0,0.5); transition: 0.2s;
+            cursor: pointer; overflow: hidden; margin-left: -25px;
+        }
+        
+        /* البطاقة داخل الكومة (المركز) لا تتقلص */
+        .discard-pile .card { margin: 0; width: 100%; height: 100%; border-width: 3px; }
 
-/* ألوان البطاقات */
-.red { background-color: #ff5555; } .red .symbol { color: #ff5555; }
-.blue { background-color: #5555ff; } .blue .symbol { color: #5555ff; }
-.yellow { background-color: #ffaa00; } .yellow .symbol { color: #ffaa00; }
-.green { background-color: #55aa55; } .green .symbol { color: #55aa55; }
-.wild { background-color: #111; }
-.wild .inner-oval { background: linear-gradient(45deg, #ff5555 25%, #5555ff 25%, #5555ff 50%, #ffaa00 50%, #ffaa00 75%, #55aa55 75%); }
-.wild .symbol { color: white; font-size: 18px; }
+        .inner-oval {
+            width: 115%; height: 75%; background-color: white;
+            border-radius: 50%; transform: rotate(-45deg);
+            position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1;
+        }
+        .symbol { font-weight: bold; transform: rotate(45deg); z-index: 2; font-size: 35px; }
+        .corner-number { position: absolute; font-size: 10px; font-weight: bold; color: white; z-index: 2; }
+        .top-left { top: 2px; left: 2px; }
+        .bottom-right { bottom: 2px; right: 2px;}
 
-.card:hover { transform: translateY(-20px); z-index: 100 !important; }
-#currentCard .card:hover { 
-    transform: none !important; 
-    z-index: 1 !important; /* أو أي قيمة تناسب تنسيقك */
-}
+        .red { background-color: var(--uno-red); } .red .symbol { color: var(--uno-red); }
+        .blue { background-color: var(--uno-blue); } .blue .symbol { color: var(--uno-blue); }
+        .yellow { background-color: var(--uno-yellow); } .yellow .symbol { color: var(--uno-yellow); }
+        .green { background-color: var(--uno-green); } .green .symbol { color: var(--uno-green); }
+        .wild { background-color: #111; }
+        .wild .inner-oval { background: linear-gradient(45deg, var(--uno-red) 25%, var(--uno-blue) 25%, var(--uno-blue) 50%, var(--uno-yellow) 50%, var(--uno-yellow) 75%, var(--uno-green) 75%); }
+        .wild .symbol { color: white; font-size: 18px; }
+
+        .my-hand .card:hover { transform: translateY(-20px); z-index: 100 !important; }
+        
         .uno-btn {
             position: absolute; right: 15px; top: -30px;
             width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000);
@@ -184,9 +177,8 @@
             justify-content: center; align-items: center; cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s;
         }
-        .uno-btn:active { transform: scale(0.9); }
 
-        /* --- 5. استايلات التدرجات لكل خانة (نفس اللوبي) --- */
+        /* تدرجات الـ Slots */
         .slot-0 .avatar-wrap { background: linear-gradient(135deg, #7b241c, #e74c3c); }
         .slot-1 .avatar-wrap { background: linear-gradient(135deg, #154360, #3498db); }
         .slot-2 .avatar-wrap { background: linear-gradient(135deg, #145a32, #2ecc71); }
@@ -197,56 +189,6 @@
         .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); }
         .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); }
         .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
-/* --- تحسينات التوهج والحدود --- */
-
-/* 1. التوهج للاعب الذي عنده الدور (يشمل الصورة والنص) */
-.player-seat.is-turn {
-    filter: drop-shadow(0 0 10px #7ed321) drop-shadow(0 0 5px #7ed321);
-    z-index: 100;
-}
-
-/* 2. الأفاتار (دائماً بحدود بيضاء مثل البقية) */
-.avatar-wrap {
-    position: relative;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    padding: 2px;
-    border: 2px solid #fff; /* حدود بيضاء ثابتة */
-    background: #333;
-    z-index: 2;
-}
-
-/* 3. مربع نص الاسم بحدود بيضاء */
-.player-name {
-    background: rgba(0,0,0,0.9);
-    padding: 2px 10px;
-    border-radius: 5px;
-    font-size: 0.65rem;
-    margin-top: -5px; /* تداخل بسيط لضمان الاتصال بصرياً */
-    z-index: 3;
-    white-space: nowrap;
-    border: 1px solid #ffffff; /* حدود بيضاء لمربع النص */
-    color: white;
-}
-
-/* 4. تمييز "أنت" (تغيير لون النص فقط داخل المربع) */
-.player-seat.is-me .player-name {
-    color: #7ed321;
-    font-weight: bold;
-    border: 1.5px solid #ffffff; /* التأكيد على الحدود البيضاء */
-}
-
-.me-tag {
-    color: #7ed321;
-    margin-right: 2px;
-}
-
-/* إلغاء أي أنيميشن نبض تماماً */
-.is-turn, .is-turn .avatar-wrap {
-    animation: none !important;
-}
-
     </style>
 </head>
 <body>
@@ -255,7 +197,7 @@
     <div class="top-bar">
         <div class="top-left">
             <div class="icon-circle">
-                <span id="playerCount" style="font-size:0.8rem;font-weight:bold;margin-left:2px;">0</span> 👤
+                <span id="playerCount">0</span> 👤
             </div> 
             <div class="btn-pill" id="roomDisplay">🔗 الغرفة</div>
         </div>
@@ -267,37 +209,33 @@
     </div>
 
     <div class="game-area">
-        <div class="players-container" id="playersContainer">
-            </div>
+        <div class="players-container" id="playersContainer"></div>
 
         <div class="arena-center">
             <div class="play-direction" id="directionIndicator"></div>
             <div class="deck-pile" id="deckPile"></div>
-            <div class="discard-pile" id="currentCard">
-            <div class="card" style="z-index:7; background-color: #ffffff; border-color: #dcdcdc;"></div>
-
-            </div>
+            <div class="discard-pile" id="currentCard"></div>
         </div>
     </div>
 
     <div class="bottom-controls">
-        <div class="uno-btn">UNO!</div>
-        <div class="my-hand" id="myHand">
-            <div class="card" style="z-index:7; background-color: #ffffff; border-color: #dcdcdc;"></div>
-            <div class="card" style="z-index:7; background-color: #ffffff; border-color: #dcdcdc;"></div>
-            <div class="card" style="z-index:7; background-color: #ffffff; border-color: #dcdcdc;"></div>
-            <div class="card" style="z-index:7; background-color: #ffffff; border-color: #dcdcdc;"></div>
-            <div class="card" style="z-index:7; background-color: #ffffff; border-color: #dcdcdc;"></div>
+        <div id="colorPicker">
+            <div class="color-btn red" onclick="selectColor('red')"></div>
+            <div class="color-btn blue" onclick="selectColor('blue')"></div>
+            <div class="color-btn green" onclick="selectColor('green')"></div>
+            <div class="color-btn yellow" onclick="selectColor('yellow')"></div>
         </div>
+
+        <div class="uno-btn">UNO!</div>
+        <div class="my-hand" id="myHand"></div>
     </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, get, update, onValue, serverTimestamp } 
+import { getDatabase, ref, update, onValue, serverTimestamp } 
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
-// 1. الإعدادات والاتصال بقاعدة البيانات
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
     authDomain: "uno-4ed20.firebaseapp.com",
@@ -305,35 +243,25 @@ const firebaseConfig = {
     projectId: "uno-4ed20",
     storageBucket: "uno-4ed20.firebasestorage.app",
     messagingSenderId: "246636486248",
-    appId: "1:246636486248:web:aaab01dccbb45dd9b665dd",
-    measurementId: "G-N34ZFTMQZT"
+    appId: "1:246636486248:web:aaab01dccbb45dd9b665dd"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// استخراج المعرفات من الرابط
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
 const playerId = urlParams.get('p');
 
-if (!roomId || !playerId) {
-    alert("بيانات الغرفة مفقودة!");
-    window.location.href = 'index.html';
-}
-
-// المراجع
-const roomRef = ref(db, `rooms/${roomId}`);
 const gameRef = ref(db, `rooms/${roomId}/game`);
 const playersRef = ref(db, `rooms/${roomId}/players`);
 
-// متغيرات الحالة المحلية
 let gameState = null;
 let playersData = null;
 let activePlayersList = [];
 let myHand = [];
+let pendingWildCard = null; // لتخزين البطاقة التي تنتظر اختيار اللون
 
-// 2. دوال مساعدة لترجمة البطاقات وتصميمها
 const valueMap = {
     "Zero": "0", "One": "1", "Two": "2", "Three": "3", "Four": "4", 
     "Five": "5", "Six": "6", "Seven": "7", "Eight": "8", "Nine": "9",
@@ -352,230 +280,150 @@ function parseCard(cardStr) {
             return { color: c, value: valueMap[valStr], symbol: valueMap[valStr], isWild: false };
         }
     }
-    return { color: "unknown", value: "?", symbol: "?", isWild: false };
+    return { color: "unknown", value: "?", symbol: "?" };
 }
 
 function createCardElement(cardStr, zIndex, onClickAction) {
     const card = parseCard(cardStr);
     const div = document.createElement('div');
-    // إضافة لون البطاقة ككلاس للـ CSS الخاص بك
-    div.className = `card ${card.color === 'wild' ? 'wild' : card.color}`;
+    div.className = `card ${card.color}`;
     div.style.zIndex = zIndex;
     
-    // إذا أردنا عرض الورقة في كومة اللعب، نجعلها تملأ المساحة
-    if(!onClickAction) {
-        div.style.margin = "0";
-        div.style.width = "100%";
-        div.style.height = "100%";
-        div.style.borderWidth = "3px";
-    }
-
     div.innerHTML = `
         <div class="corner-number top-left">${card.value}</div>
         <div class="inner-oval"><span class="symbol">${card.symbol}</span></div>
         <div class="corner-number bottom-right">${card.value}</div>
     `;
 
-    if (onClickAction) {
-        div.onclick = onClickAction;
-        div.style.cursor = "pointer";
-    }
-
+    if (onClickAction) div.onclick = onClickAction;
     return div;
 }
 
-// 3. دالة رسم واجهة اللعبة
 function renderGame() {
     if (!gameState || !playersData) return;
 
-    // --- رسم اللاعبين (دالتك) ---
     const currentTurnId = gameState.turnState.currentTurnId;
     window.layoutPlayers(playersData, playerId, currentTurnId);
 
-    // --- تحديث مؤشر الاتجاه واللون ---
+    // تحديث الاتجاه واللون
     const directionEl = document.getElementById('directionIndicator');
     const topCardStr = gameState.discardPile[gameState.discardPile.length - 1];
     const topCard = parseCard(topCardStr);
-    
-    // تحديد اللون الفعال (إما لون الورقة العادية، أو اللون المختار للجوكر)
     const activeColor = gameState.turnState.selectedColor || topCard.color;
     
     directionEl.className = `play-direction ${gameState.turnState.direction === -1 ? 'ccw' : ''}`;
-    // تغيير لون دوران المؤشر حسب اللون الحالي (يتطلب وجود متغيرات CSS مثل var(--uno-red) )
-    directionEl.style.borderTopColor = `var(--uno-${activeColor}, ${activeColor})`;
+    directionEl.style.borderTopColor = `var(--uno-${activeColor})`;
 
-    // --- رسم كومة اللعب (Discard Pile) ---
+    // رسم الكومة المركزية
     const discardContainer = document.getElementById('currentCard');
     discardContainer.innerHTML = '';
     discardContainer.appendChild(createCardElement(topCardStr, 1, null));
 
-    // --- رسم أوراقي (My Hand) ---
+    // رسم يدي
     const handContainer = document.getElementById('myHand');
     handContainer.innerHTML = '';
-    
     myHand.forEach((cardStr, index) => {
-        const isMyTurn = currentTurnId === playerId;
-        // إذا كان دوري، أسمح بنقر البطاقة، وإلا لا تفعل شيء
-        const action = isMyTurn ? () => handlePlayCard(cardStr, index) : null;
+        const action = (currentTurnId === playerId) ? () => handlePlayCard(cardStr, index) : null;
         handContainer.appendChild(createCardElement(cardStr, index + 1, action));
     });
 }
 
-// 4. منطق اللعب
-function isValidMove(playedCardStr) {
-    const topCardStr = gameState.discardPile[gameState.discardPile.length - 1];
-    const topCard = parseCard(topCardStr);
-    const activeColor = gameState.turnState.selectedColor || topCard.color;
-    const activeValue = topCard.value;
-
-    const playedCard = parseCard(playedCardStr);
-
-    if (playedCard.isWild) return true;
-    if (playedCard.color === activeColor) return true;
-    if (playedCard.value === activeValue) return true;
-
-    return false;
-}
-
-function getNextPlayerId(skip = false) {
-    const currentIndex = activePlayersList.findIndex(p => p.id === gameState.turnState.currentTurnId);
-    let step = gameState.turnState.direction;
-    if (skip) step *= 2; // تخطي لاعب
-
-    let nextIndex = (currentIndex + step) % activePlayersList.length;
-    if (nextIndex < 0) nextIndex += activePlayersList.length;
-
-    return activePlayersList[nextIndex].id;
-}
+// دالة اختيار اللون من الديالوق
+window.selectColor = function(color) {
+    if (!pendingWildCard) return;
+    const { cardStr, cardIndex } = pendingWildCard;
+    document.getElementById('colorPicker').style.display = 'none';
+    executeMove(cardStr, cardIndex, color);
+    pendingWildCard = null;
+};
 
 async function handlePlayCard(cardStr, cardIndex) {
-    if (!isValidMove(cardStr)) {
-        alert("لا يمكنك لعب هذه البطاقة!");
-        return;
-    }
-
-    let nextDirection = gameState.turnState.direction;
-    let skipNext = false;
-    let selectedColor = "";
-    let cardsToDrawForNext = 0;
+    if (!isValidMove(cardStr)) return alert("لا يمكنك لعب هذه البطاقة!");
 
     const card = parseCard(cardStr);
+    if (card.isWild) {
+        pendingWildCard = { cardStr, cardIndex };
+        document.getElementById('colorPicker').style.display = 'flex';
+    } else {
+        executeMove(cardStr, cardIndex, card.color);
+    }
+}
 
-    // معالجة الأكشن
+async function executeMove(cardStr, cardIndex, chosenColor) {
+    let nextDirection = gameState.turnState.direction;
+    let skipNext = false;
+    let cardsToDraw = 0;
+    const card = parseCard(cardStr);
+
     if (card.value === "↻") {
         nextDirection *= -1;
-        // إذا كان عدد اللاعبين 2، العكس يعمل كأنه تخطي
         if (activePlayersList.length === 2) skipNext = true;
-    } else if (card.value === "⊘") {
-        skipNext = true;
-    } else if (card.value === "+2") {
-        cardsToDrawForNext = 2; // في تحديث قادم يمكن ربطها بنظام التراكم (drawStack)
-    }
+    } else if (card.value === "⊘") skipNext = true;
+    else if (card.value === "+2") cardsToDraw = 2;
+    else if (card.value === "+4") cardsToDraw = 4;
 
-    // إذا كانت بطاقة جوكر، يجب اختيار لون
-    if (card.isWild) {
-        // يمكنك لاحقاً استبدال هذا الـ prompt بواجهة اختيار ألوان جميلة
-        const colorInput = prompt("اختر لوناً: red, blue, green, yellow");
-        if (["red", "blue", "green", "yellow"].includes(colorInput)) {
-            selectedColor = colorInput;
-        } else {
-            selectedColor = "red"; // افتراضي إذا أخطأ الإدخال
-        }
-        
-        if (card.value === "+4") cardsToDrawForNext = 4;
-    } else {
-        selectedColor = card.color;
-    }
-
-    // تجهيز التحديثات
     const nextPlayerId = getNextPlayerId(skipNext);
     const updates = {};
 
-    // تحديث أوراقي
     myHand.splice(cardIndex, 1);
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
 
-    // تحديث حالة اللعبة (الكومة والدور)
     const newDiscardPile = [...gameState.discardPile, cardStr];
     updates[`rooms/${roomId}/game/discardPile`] = newDiscardPile;
     updates[`rooms/${roomId}/game/turnState`] = {
         currentTurnId: nextPlayerId,
         direction: nextDirection,
-        selectedColor: selectedColor,
-        drawStack: gameState.turnState.drawStack, // يمكن زيادتها هنا إذا التراكم مفعل
+        selectedColor: chosenColor,
+        drawStack: 0,
         lastUpdated: serverTimestamp()
     };
 
-    // معالجة سحب البطاقات للاعب التالي إذا رميت عليه +2 أو +4
-    // (للبساطة: يتم خصمها من الكومة وإضافتها فوراً ليد اللاعب القادم)
-    if (cardsToDrawForNext > 0) {
+    if (cardsToDraw > 0) {
         let deck = [...gameState.deck];
-        let nextPlayerHand = playersData[nextPlayerId].hand || [];
-        
-        for (let i = 0; i < cardsToDrawForNext; i++) {
-            if (deck.length > 0) nextPlayerHand.push(deck.pop());
-        }
-        
+        let nextHand = playersData[nextPlayerId].hand || [];
+        for (let i = 0; i < cardsToDraw; i++) if (deck.length > 0) nextHand.push(deck.pop());
         updates[`rooms/${roomId}/game/deck`] = deck;
-        updates[`rooms/${roomId}/players/${nextPlayerId}/hand`] = nextPlayerHand;
-        updates[`rooms/${roomId}/players/${nextPlayerId}/handCount`] = nextPlayerHand.length;
+        updates[`rooms/${roomId}/players/${nextPlayerId}/hand`] = nextHand;
+        updates[`rooms/${roomId}/players/${nextPlayerId}/handCount`] = nextHand.length;
     }
 
-    try {
-        await update(ref(db), updates);
-    } catch (e) {
-        console.error("خطأ أثناء لعب الورقة: ", e);
-    }
+    await update(ref(db), updates);
 }
 
-// دالة سحب ورقة (اربطها بعنصر deckPile)
+function isValidMove(playedStr) {
+    const topStr = gameState.discardPile[gameState.discardPile.length - 1];
+    const top = parseCard(topStr);
+    const played = parseCard(playedStr);
+    const activeCol = gameState.turnState.selectedColor || top.color;
+    return played.isWild || played.color === activeCol || played.value === top.value;
+}
+
+function getNextPlayerId(skip) {
+    const idx = activePlayersList.findIndex(p => p.id === gameState.turnState.currentTurnId);
+    let step = gameState.turnState.direction * (skip ? 2 : 1);
+    let nextIdx = (idx + step) % activePlayersList.length;
+    if (nextIdx < 0) nextIdx += activePlayersList.length;
+    return activePlayersList[nextIdx].id;
+}
+
 document.getElementById('deckPile').onclick = async () => {
-    if (gameState.turnState.currentTurnId !== playerId) {
-        alert("ليس دورك!");
-        return;
-    }
-
+    if (gameState.turnState.currentTurnId !== playerId) return alert("ليس دورك!");
     let deck = [...gameState.deck];
-    if (deck.length === 0) {
-        alert("الكومة فارغة، سيتم إعادة الخلط قريباً!");
-        // هنا يمكنك إضافة منطق أخذ كومة اللعب وخلطها
-        return;
-    }
-
-    const drawnCard = deck.pop();
-    myHand.push(drawnCard);
-
-    const nextPlayerId = getNextPlayerId(false);
-
+    if (deck.length === 0) return alert("الكومة فارغة!");
+    myHand.push(deck.pop());
     const updates = {};
     updates[`rooms/${roomId}/game/deck`] = deck;
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
-    updates[`rooms/${roomId}/game/turnState/currentTurnId`] = nextPlayerId;
-    updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
-
+    updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false);
     await update(ref(db), updates);
 };
 
-// 5. مستمعي قاعدة البيانات (Real-time Listeners)
 onValue(playersRef, (snap) => {
     playersData = snap.val() || {};
-    
-    // تصفية اللاعبين الموجودين في الـ slots وترتيبهم
-    activePlayersList = Object.values(playersData)
-        .filter(p => p.slot && p.slot.startsWith('slot-'))
-        .sort((a, b) => {
-            const slotA = parseInt(a.slot.split('-')[1]);
-            const slotB = parseInt(b.slot.split('-')[1]);
-            return slotA - slotB;
-        });
-
-    // تحديث أوراقي محلياً
-    if (playersData[playerId] && playersData[playerId].hand) {
-        myHand = playersData[playerId].hand;
-    }
-
+    activePlayersList = Object.values(playersData).filter(p => p.slot?.startsWith('slot-')).sort((a, b) => parseInt(a.slot.split('-')[1]) - parseInt(b.slot.split('-')[1]));
+    if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
     renderGame();
 });
 
@@ -584,65 +432,27 @@ onValue(gameRef, (snap) => {
     renderGame();
 });
 
-// دالتك الخاصة بترتيب اللاعبين (أرفقها كما هي تماماً بداخل السكربت)
 window.layoutPlayers = function(playersData, myId, currentTurnId) {
     const container = document.getElementById('playersContainer');
     container.innerHTML = '';
-    
-    const playersArray = Object.values(playersData).filter(p => p.slot && p.slot.startsWith('slot-'));
-    const totalPlayers = playersArray.length;
-    
-    const configs = {
-        1:  { right: 0, top: 0, left: 0 },
-        2:  { right: 1, top: 0, left: 1 },
-        3:  { right: 1, top: 1, left: 1 },
-        4:  { right: 2, top: 0, left: 2 },
-        5:  { right: 2, top: 1, left: 2 },
-        6:  { right: 2, top: 2, left: 2 },
-        7:  { right: 2, top: 3, left: 2 },
-        8:  { right: 3, top: 2, left: 3 },
-        9:  { right: 3, top: 3, left: 3 },
-        10: { right: 4, top: 2, left: 4 }
-    };
-
-    const config = configs[totalPlayers] || configs[7];
+    const playersArray = Object.values(playersData).filter(p => p.slot?.startsWith('slot-'));
+    const configs = { 1:{r:0,t:0,l:0}, 2:{r:1,t:0,l:1}, 3:{r:1,t:1,l:1}, 4:{r:2,t:0,l:2}, 5:{r:2,t:1,l:2}, 6:{r:2,t:2,l:2}, 7:{r:2,t:3,l:2}, 8:{r:3,t:2,l:3}, 9:{r:3,t:3,l:3}, 10:{r:4,t:2,l:4} };
+    const config = configs[playersArray.length] || configs[7];
     let positions = [];
+    for(let i=config.l-1; i>=0; i--) positions.push({s:'left', t:(100/(config.l+1))*(i+1)});
+    for(let i=0; i<config.t; i++) positions.push({s:'top', l:(100/(config.t+1))*(i+1)});
+    for(let i=0; i<config.r; i++) positions.push({s:'right', t:(100/(config.r+1))*(i+1)});
 
-    for(let i = config.left - 1; i >= 0; i--) positions.push({ side: 'left', top: (100 / (config.left + 1)) * (i + 1) });
-    for(let i = 0; i < config.top; i++) positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) });
-    for(let i = 0; i < config.right; i++) positions.push({ side: 'right', top: (100 / (config.right + 1)) * (i + 1) });
-
-    playersArray.forEach((player, idx) => {
-        if (!positions[idx]) return;
-
-        const isMe = (player.id === myId); 
-        const hasTurn = (player.id === currentTurnId);
-        const pos = positions[idx];
-        
+    playersArray.forEach((p, i) => {
+        if (!positions[i]) return;
+        const pos = positions[i];
         const seat = document.createElement('div');
-        seat.className = `player-seat ${player.slot} ${isMe ? 'is-me' : ''} ${hasTurn ? 'is-turn' : ''}`;
-        
-        let style = "";
-        if(pos.side === 'right') style = `top: ${pos.top}%; right: 15px; transform: translateY(-50%);`;
-        if(pos.side === 'left')  style = `top: ${pos.top}%; left: 15px; transform: translateY(-50%);`;
-        if(pos.side === 'top')   style = `top: 20px; left: ${pos.left}%; transform: translateX(-50%);`;
-        
-        seat.style.cssText = style;
-
-        seat.innerHTML = `
-            <div class="avatar-wrap">
-                <img src="${player.avatar}">
-                <div class="card-count-badge">${player.handCount || 0}</div>
-            </div>
-            <div class="player-name">
-                ${player.name} ${isMe ? '<span class="me-tag">(أنت)</span>' : ''}
-            </div>
-        `;
+        seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId?'is-turn':''}`;
+        seat.style.cssText = pos.s==='right'?`top:${pos.t}%;right:15px;transform:translateY(-50%);`:pos.s==='left'?`top:${pos.t}%;left:15px;transform:translateY(-50%);`:`top:20px;left:${pos.l}%;transform:translateX(-50%);`;
+        seat.innerHTML = `<div class="avatar-wrap"><img src="${p.avatar}"><div class="card-count-badge">${p.handCount||0}</div></div><div class="player-name">${p.name}${p.id===myId?' <span class="me-tag">(أنت)</span>':''}</div>`;
         container.appendChild(seat);
     });
-
-    const countEl = document.getElementById('playerCount');
-    if(countEl) countEl.innerText = totalPlayers;
+    document.getElementById('playerCount').innerText = playersArray.length;
 }
 </script>
 </body>
