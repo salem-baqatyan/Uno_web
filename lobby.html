@@ -982,30 +982,50 @@ function createUnoDeck(numDecks = 1, includeEraser = false) {
     const deck = [];
 
     for (let d = 0; d < numDecks; d++) {
+
+        // الأرقام
         colors.forEach(color => {
-            deck.push(`${color}${numbers[0]}`);
+
+            // صفر مرة واحدة
+            deck.push(`${color}Zero`);
+
+            // 1–9 مرتين
             for (let i = 1; i <= 9; i++) {
-                deck.push(`${color}${numbers[i]}`, `${color}${numbers[i]}`);
+                deck.push(`${color}${numbers[i]}`);
+                deck.push(`${color}${numbers[i]}`);
             }
+
+            // الأكشن مرتين
             actionTypes.forEach(action => {
-                deck.push(`${color}${action}`, `${color}${action}`);
+                deck.push(`${color}${action}`);
+                deck.push(`${color}${action}`);
             });
         });
 
+        // Wild
         for (let i = 0; i < 4; i++) {
-            deck.push("wildColor", "wildDrawFour");
+            deck.push("wildColor");
+            deck.push("wildDrawFour");
         }
 
         if (includeEraser) {
             deck.push("Eraser");
         }
     }
+
+    // 🔒 تحقق نهائي من العدد
+    const expectedPerDeck = includeEraser ? 109 : 108;
+    const expectedTotal = expectedPerDeck * numDecks;
+
+    if (deck.length !== expectedTotal) {
+        throw new Error(`Deck size mismatch! Expected ${expectedTotal} but got ${deck.length}`);
+    }
+
     return deck;
 }
 window.handleStartGame = async () => {
     if (!isAdmin) return;
 
-    // 1. جلب بيانات اللاعبين والإعدادات
     const [playersSnap, settingsSnap] = await Promise.all([
         get(playersRef),
         get(settingsRef)
@@ -1013,8 +1033,7 @@ window.handleStartGame = async () => {
 
     const playersData = playersSnap.val() || {};
     const settings = settingsSnap.val() || defaultSettings;
-    
-    // 2. فلترة اللاعبين الفعليين (الخانات فقط) وترتيبهم حسب رقم الـ Slot
+
     let activePlayers = Object.values(playersData)
         .filter(p => p.slot.startsWith('slot-'))
         .sort((a, b) => {
@@ -1027,15 +1046,14 @@ window.handleStartGame = async () => {
         return showToast("⚠️ يجب أن ينضم لاعبان على الأقل للبدء");
     }
 
-    // إظهار شاشة تحميل للآدمن ريثما يتم تجهيز اللعبة
     document.getElementById('startBtn').innerText = "جاري التجهيز...";
     document.getElementById('startBtn').disabled = true;
 
-    // 3. إنشاء وخلط الأوراق
+    // إنشاء وخلط
     let deck = createUnoDeck(settings.decks, settings.eraser);
     shuffleArray(deck);
 
-    // 4. توزيع الأوراق على اللاعبين
+    // توزيع
     let hands = {};
     activePlayers.forEach(p => {
         hands[p.id] = [];
@@ -1044,32 +1062,18 @@ window.handleStartGame = async () => {
         }
     });
 
-    // 5. تحديد الورقة الأولى في كومة اللعب
-    let firstCard = null;
-    let tempDeck = [];
-    while (deck.length > 0) {
-        let card = deck.pop();
-        // منع بدء اللعبة ببطاقة سحب 4 أو ماسح (لأنها ستكسر المنطق)
-        if (card === "wildDrawFour" || card === "Eraser") {
-            tempDeck.push(card);
-        } else {
-            firstCard = card;
-            break;
-        }
-    }
-    // إعادة البطاقات المستبعدة للكومة وخلطها مجدداً
-    deck.push(...tempDeck);
-    shuffleArray(deck);
+    // اختيار أول بطاقة آمنة
+    let firstCard;
+    do {
+        firstCard = deck.pop();
+    } while (firstCard === "wildDrawFour" || firstCard === "Eraser");
 
-    // 6. تجهيز حالة اللعبة (Game State)
-    // تحديد اللاعب الذي سيبدأ عشوائياً
+    // تحديد اللاعب العشوائي
     const startingPlayerIndex = Math.floor(Math.random() * activePlayers.length);
     const startingPlayerId = activePlayers[startingPlayerIndex].id;
 
-    // تحديد الاتجاه الافتراضي (إذا كانت الورقة الأولى عكس، نعكس الاتجاه)
     let initialDirection = firstCard.includes("Reverse") ? -1 : 1;
 
-    // إذا كانت الورقة الأولى "تغيير لون"، نختار لون عشوائي للبدء لتسهيل اللعب
     let initialSelectedColor = "";
     if (firstCard === "wildColor") {
         const colors = ["red", "blue", "green", "yellow"];
@@ -1077,35 +1081,33 @@ window.handleStartGame = async () => {
     }
 
     const gameState = {
-        deck: deck, // كومة السحب
-        discardPile: [firstCard], // كومة اللعب
+        deck,
+        discardPile: [firstCard],
         turnState: {
             currentTurnId: startingPlayerId,
-            direction: initialDirection, // 1 مع عقارب الساعة، -1 عكس
-            drawStack: 0, // عداد السحب المتراكم
-            selectedColor: initialSelectedColor, 
-            lastUpdated: serverTimestamp() // لضمان التزامن
+            direction: initialDirection,
+            drawStack: 0,
+            selectedColor: initialSelectedColor,
+            lastUpdated: serverTimestamp()
         }
     };
 
-    // 7. تجميع كل التحديثات في كائن واحد لرفعها دفعة واحدة (Atomic Update)
-    let updates = {};
-    
-    // تحديث أوراق كل لاعب
-    activePlayers.forEach(p => {
-        updates[`rooms/${roomId}/players/${p.id}/hand`] = hands[p.id];
-        updates[`rooms/${roomId}/players/${p.id}/handCount`] = hands[p.id].length;
-    });
-
-    // رفع حالة اللعبة وتغيير حالة الغرفة
-    updates[`rooms/${roomId}/game`] = gameState;
-    updates[`rooms/${roomId}/status`] = "started";
-    updates[`rooms/${roomId}/startedAt`] = serverTimestamp();
-
-    // 8. إرسال البيانات للفايربيس
     try {
+        // 🔥 استبدال game بالكامل (لا دمج)
+        await set(ref(db, `rooms/${roomId}/game`), gameState);
+
+        // تحديث أيدي اللاعبين
+        const updates = {};
+        activePlayers.forEach(p => {
+            updates[`rooms/${roomId}/players/${p.id}/hand`] = hands[p.id];
+            updates[`rooms/${roomId}/players/${p.id}/handCount`] = hands[p.id].length;
+        });
+
+        updates[`rooms/${roomId}/status`] = "started";
+        updates[`rooms/${roomId}/startedAt`] = serverTimestamp();
+
         await update(ref(db), updates);
-        // سيقوم مستمع الـ onValue(roomRef) بنقل الجميع لصفحة اللعب تلقائياً
+
     } catch (error) {
         console.error("Error generating game state:", error);
         showToast("حدث خطأ أثناء تجهيز اللعبة!");
@@ -1113,6 +1115,7 @@ window.handleStartGame = async () => {
         document.getElementById('startBtn').disabled = false;
     }
 };
+
 onValue(roomRef, (snap) => {
     const data = snap.val();
     if (data?.status === "started") {
