@@ -321,19 +321,109 @@
     </div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getDatabase, ref, onValue, get } 
+from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
-function layoutPlayers(playersData, myId, currentTurnId) {
+// 1. إعدادات الفايربيس (نفسها)
+const firebaseConfig = {
+    apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
+    authDomain: "uno-4ed20.firebaseapp.com",
+    databaseURL: "https://uno-4ed20-default-rtdb.firebaseio.com",
+    projectId: "uno-4ed20",
+    storageBucket: "uno-4ed20.firebasestorage.app",
+    messagingSenderId: "246636486248",
+    appId: "1:246636486248:web:aaab01dccbb45dd9b665dd",
+    measurementId: "G-N34ZFTMQZT"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// استخراج البيانات من الرابط (الغرفة واللاعب)
+const urlParams = new URLSearchParams(window.location.search);
+const roomId = urlParams.get('r');
+const myId = sessionStorage.getItem('playerId') || localStorage.getItem('uno_playerId');
+
+if (!roomId || !myId) {
+    window.location.href = "index.html"; // طرد إذا لم تكن البيانات موجودة
+}
+
+document.getElementById('roomDisplay').innerText = "🔗 " + roomId;
+
+// 2. دوال مساعدة لترجمة البطاقات للتصميم الخاص بك
+const cardValuesMap = {
+    "Zero": "0", "One": "1", "Two": "2", "Three": "3", "Four": "4",
+    "Five": "5", "Six": "6", "Seven": "7", "Eight": "8", "Nine": "9",
+    "Skip": "⊘", "Reverse": "↻", "DrawTwo": "+2"
+};
+
+function parseCardString(cardString) {
+    if (cardString === "wildColor") return { color: "wild", symbol: "Color", corner: "C" };
+    if (cardString === "wildDrawFour") return { color: "wild", symbol: "+4", corner: "+4" };
+    if (cardString === "Eraser") return { color: "white", symbol: "🧽", corner: "E" }; // تخصيص الماسح
+
+    const colors = ["red", "blue", "green", "yellow"];
+    let cardColor = "wild";
+    let cardValue = cardString;
+
+    for (let c of colors) {
+        if (cardString.startsWith(c)) {
+            cardColor = c;
+            cardValue = cardString.substring(c.length);
+            break;
+        }
+    }
+
+    const displaySymbol = cardValuesMap[cardValue] || cardValue;
+    return { color: cardColor, symbol: displaySymbol, corner: displaySymbol };
+}
+
+// بناء الـ HTML للبطاقة بناءً على تصميمك
+function buildCardElement(cardString, zIndex = 0, isDiscardPile = false) {
+    const cardData = parseCardString(cardString);
+    const cardDiv = document.createElement('div');
+    
+    cardDiv.className = `card ${cardData.color}`;
+    
+    // إذا كانت البطاقة في المنتصف، نعطيها الستايل الخاص بها
+    if (isDiscardPile) {
+        cardDiv.style.cssText = "margin:0; width:100%; height:100%; border-width:3px;";
+    } else {
+        cardDiv.style.zIndex = zIndex;
+    }
+
+    // تصغير الخط لبعض الرموز الكبيرة لتناسب الدائرة
+    const symbolStyle = (cardData.symbol === "+2" || cardData.symbol === "+4") ? 'style="font-size:25px"' : '';
+
+    cardDiv.innerHTML = `
+        <div class="corner-number top-left">${cardData.corner}</div>
+        <div class="inner-oval"><span class="symbol" ${symbolStyle}>${cardData.symbol}</span></div>
+        <div class="corner-number bottom-right">${cardData.corner}</div>
+    `;
+    
+    return cardDiv;
+}
+
+// 3. دالة رسم اللاعبين (الدالة الخاصة بك مع ترتيب الـ Slot)
+function layoutPlayers(playersData, currentTurnId) {
     const container = document.getElementById('playersContainer');
     container.innerHTML = '';
     
-    // تحويل الكائن إلى مصفوفة لسهولة التعامل معها
-    const playersArray = Object.values(playersData);
+    // فلترة المتفرجين، وترتيب اللاعبين حسب الـ Slot
+    let playersArray = Object.values(playersData)
+        .filter(p => p.slot && p.slot.startsWith('slot-'))
+        .sort((a, b) => {
+            const slotA = parseInt(a.slot.split('-')[1]);
+            const slotB = parseInt(b.slot.split('-')[1]);
+            return slotA - slotB;
+        });
+
     const totalPlayers = playersArray.length;
     
-    // إعدادات التوزيع الأصلية الخاصة بك
     const configs = {
-        1:  { right: 0, top: 0, left: 0 }, // حالة لاعب واحد (اختبار)
+        1:  { right: 0, top: 0, left: 0 }, 
         2:  { right: 1, top: 0, left: 1 },
         3:  { right: 1, top: 1, left: 1 },
         4:  { right: 2, top: 0, left: 2 },
@@ -348,30 +438,18 @@ function layoutPlayers(playersData, myId, currentTurnId) {
     const config = configs[totalPlayers] || configs[7];
     let positions = [];
 
-    // التوزيع عكس عقارب الساعة (نفس ترتيبك الأخير)
-    // 1. اليسار: من الأسفل صعوداً
-    for(let i = config.left - 1; i >= 0; i--) {
-        positions.push({ side: 'left', top: (100 / (config.left + 1)) * (i + 1) });
-    }
-    // 2. الأعلى: من اليسار إلى اليمين
-    for(let i = 0; i < config.top; i++) {
-        positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) });
-    }
-    // 3. اليمين: من الأعلى نزولاً
-    for(let i = 0; i < config.right; i++) {
-        positions.push({ side: 'right', top: (100 / (config.right + 1)) * (i + 1) });
-    }
+    for(let i = config.left - 1; i >= 0; i--) { positions.push({ side: 'left', top: (100 / (config.left + 1)) * (i + 1) }); }
+    for(let i = 0; i < config.top; i++) { positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) }); }
+    for(let i = 0; i < config.right; i++) { positions.push({ side: 'right', top: (100 / (config.right + 1)) * (i + 1) }); }
 
-    // رسم اللاعبين بناءً على البيانات القادمة
     playersArray.forEach((player, idx) => {
-        if (!positions[idx]) return; // حماية في حال زاد عدد اللاعبين عن المواقع
+        if (!positions[idx]) return; 
 
         const isMe = (player.id === myId); 
         const hasTurn = (player.id === currentTurnId);
         const pos = positions[idx];
         
         const seat = document.createElement('div');
-        // استخدام slot القادم من البيانات للألوان، و is-me / is-turn للتمييز
         seat.className = `player-seat ${player.slot} ${isMe ? 'is-me' : ''} ${hasTurn ? 'is-turn' : ''}`;
         
         let style = "";
@@ -384,7 +462,7 @@ function layoutPlayers(playersData, myId, currentTurnId) {
         seat.innerHTML = `
             <div class="avatar-wrap">
                 <img src="${player.avatar}">
-                <div class="card-count-badge">${player.handCount}</div>
+                <div class="card-count-badge">${player.handCount || 0}</div>
             </div>
             <div class="player-name">
                 ${player.name} ${isMe ? '<span class="me-tag">(أنت)</span>' : ''}
@@ -393,34 +471,54 @@ function layoutPlayers(playersData, myId, currentTurnId) {
         container.appendChild(seat);
     });
 
-    // تحديث عداد اللاعبين في الأعلى (اختياري)
     const countEl = document.getElementById('playerCount');
     if(countEl) countEl.innerText = totalPlayers;
 }
 
-// --- مثال لكيفية تشغيل الدالة ببياناتك ---
-const dataFromDB = {
-    "players": {
-        "mfntf9": {
-            "avatar": "img/avatar/pizza_guy.webp",
-            "id": "mfntf9",
-            "name": "abdo",
-            "slot": "slot-0",
-            "handCount": 7
-        },
-        "xg4yr5": {
-            "avatar": "img/avatar/snowman.webp",
-            "id": "xg4yr5",
-            "name": "salem",
-            "slot": "slot-1",
-            "handCount": 5
-        }
+// 4. الاستماع اللحظي للبيانات وتحديث الواجهة
+const roomRef = ref(db, `rooms/${roomId}`);
+onValue(roomRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data || !data.game || !data.players) return;
+
+    const game = data.game;
+    const players = data.players;
+    const myData = players[myId];
+
+    // -- تحديث اللاعبين ومؤشر الدور --
+    layoutPlayers(players, game.turnState.currentTurnId);
+
+    // -- تحديث اتجاه اللعب (عكس أم مع عقارب الساعة) --
+    const dirIndicator = document.getElementById('directionIndicator');
+    if (dirIndicator) {
+        dirIndicator.innerText = game.turnState.direction === 1 ? "⟳" : "⟲";
     }
-};
 
-// تشغيل: اللاعب هو "abdo" والدور حالياً على "salem"
-layoutPlayers(dataFromDB.players, "mfntf9", "xg4yr5");
+    // -- تحديث الورقة الحالية (كومة اللعب) --
+    const currentCardContainer = document.getElementById('currentCard');
+    const lastDiscarded = game.discardPile[game.discardPile.length - 1];
+    currentCardContainer.innerHTML = '';
+    currentCardContainer.appendChild(buildCardElement(lastDiscarded, 0, true));
 
+    // -- تحديث أوراقي في الأسفل --
+    const myHandContainer = document.getElementById('myHand');
+    myHandContainer.innerHTML = '';
+    
+    if (myData && myData.hand) {
+        myData.hand.forEach((cardString, index) => {
+            // نمرر index + 1 ليكون الـ z-index متدرجاً حسب تصميمك
+            const cardEl = buildCardElement(cardString, index + 1, false);
+            
+            // إضافة خاصية الضغط على الكرت مستقبلاً
+            cardEl.onclick = () => {
+                console.log("تم الضغط على الكرت:", cardString);
+                // سيتم برمجة منطق رمي البطاقة هنا لاحقاً
+            };
+            
+            myHandContainer.appendChild(cardEl);
+        });
+    }
+});
 </script>
 </body>
 </html>
