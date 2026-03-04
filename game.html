@@ -189,6 +189,31 @@
         .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); }
         .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); }
         .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
+    
+    .stack-warning {
+        position: absolute;
+        bottom: 170px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 0, 0, 0.9);
+        padding: 8px 15px;
+        border-radius: 10px;
+        text-align: center;
+        z-index: 1000;
+        border: 2px solid white;
+        display: none; /* يظهر فقط عند الحاجة */
+        animation: shake 0.5s infinite;
+    }
+    .stack-warning span { display: block; font-size: 0.8rem; font-weight: bold; }
+    .btn-draw-skip {
+        background: white; color: red; border: none; padding: 5px 10px;
+        border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 5px;
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(-50%) rotate(0); }
+        25% { transform: translateX(-52%) rotate(-1deg); }
+        75% { transform: translateX(-48%) rotate(1deg); }
+    }    
     </style>
 </head>
 <body>
@@ -224,6 +249,10 @@
             <div class="color-btn blue" onclick="selectColor('blue')"></div>
             <div class="color-btn green" onclick="selectColor('green')"></div>
             <div class="color-btn yellow" onclick="selectColor('yellow')"></div>
+        </div>
+        <div id="stackUI" class="stack-warning">
+            <span id="stackText">تراكمات السحب الموجهة إليك: +0</span>
+            <button class="btn-draw-skip" onclick="acceptStack()">اسحب وتخطى الدور</button>
         </div>
 
         <div class="uno-btn">UNO!</div>
@@ -349,46 +378,105 @@ async function handlePlayCard(cardStr, cardIndex) {
     }
 }
 
+// دالة قبول السحب (الاستسلام)
+window.acceptStack = async () => {
+    let deck = [...gameState.deck];
+    let discard = [...gameState.discardPile];
+    let myNewHand = [...myHand];
+    let amount = gameState.turnState.drawStack;
+
+    for (let i = 0; i < amount; i++) {
+        if (deck.length === 0) {
+            // إعادة خلط الكومة إذا انتهت
+            const topCard = discard.pop();
+            deck = shuffleArray(discard);
+            discard = [topCard];
+        }
+        if (deck.length > 0) myNewHand.push(deck.pop());
+    }
+
+    const updates = {};
+    updates[`rooms/${roomId}/game/deck`] = deck;
+    updates[`rooms/${roomId}/game/discardPile`] = discard;
+    updates[`rooms/${roomId}/players/${playerId}/hand`] = myNewHand;
+    updates[`rooms/${roomId}/players/${playerId}/handCount`] = myNewHand.length;
+    updates[`rooms/${roomId}/game/turnState/drawStack`] = 0; // تصفير التراكم
+    updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(true); // تخطي الدور
+
+    await update(ref(db), updates);
+};
+
+// خلط المصفوفة (Fisher-Yates Shuffle)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// تعديل دالة لعب الورقة لدعم التراكم والماسح
 async function executeMove(cardStr, cardIndex, chosenColor) {
+    const card = parseCard(cardStr);
+    const roomSettings = gameState.settings; // افترضنا وجودها في gameState
+    let currentStack = gameState.turnState.drawStack || 0;
     let nextDirection = gameState.turnState.direction;
     let skipNext = false;
-    let cardsToDraw = 0;
-    const card = parseCard(cardStr);
 
-    if (card.value === "↻") {
-        nextDirection *= -1;
-        if (activePlayersList.length === 2) skipNext = true;
-    } else if (card.value === "⊘") skipNext = true;
-    else if (card.value === "+2") cardsToDraw = 2;
-    else if (card.value === "+4") cardsToDraw = 4;
+    // 1. منطق بطاقة الماسح (Eraser)
+    if (card.symbol === "Eraser") {
+        currentStack = 0; // مسح السحب
+        skipNext = false; // لا يسحب ولا يتخطى (يمر دور طبيعي)
+    } 
+    // 2. منطق التراكم
+    else if (roomSettings.stacking) {
+        if (card.value === "+2") currentStack += 2;
+        else if (card.value === "+4") currentStack += 4;
+        
+        // إذا لعبت بطاقة سحب، التراكم ينتقل للاعب التالي دون أن يسحب "أنت"
+        // اللاعب التالي هو من سيواجه الـ UI
+    } 
+    else {
+        // إذا التراكم غير مفعل، السحب فوري
+        if (card.value === "+2") currentStack = 2;
+        if (card.value === "+4") currentStack = 4;
+        // سيتم معالجة السحب الفوري في نهاية الدالة
+    }
 
-    const nextPlayerId = getNextPlayerId(skipNext);
+    // تجهيز التحديثات لقاعدة البيانات
     const updates = {};
-
     myHand.splice(cardIndex, 1);
+    
+    // إذا انتهت البطاقات (فوز أو حساب نقاط)
+    if (myHand.length === 0) {
+        handleGameOver(); 
+    }
+
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
-
-    const newDiscardPile = [...gameState.discardPile, cardStr];
-    updates[`rooms/${roomId}/game/discardPile`] = newDiscardPile;
+    updates[`rooms/${roomId}/game/discardPile`] = [...gameState.discardPile, cardStr];
+    
     updates[`rooms/${roomId}/game/turnState`] = {
-        currentTurnId: nextPlayerId,
-        direction: nextDirection,
+        currentTurnId: getNextPlayerId(card.value === "⊘" || (card.value === "↻" && activePlayersList.length === 2)),
+        direction: (card.value === "↻" && activePlayersList.length > 2) ? nextDirection * -1 : nextDirection,
         selectedColor: chosenColor,
-        drawStack: 0,
+        drawStack: currentStack,
         lastUpdated: serverTimestamp()
     };
 
-    if (cardsToDraw > 0) {
-        let deck = [...gameState.deck];
-        let nextHand = playersData[nextPlayerId].hand || [];
-        for (let i = 0; i < cardsToDraw; i++) if (deck.length > 0) nextHand.push(deck.pop());
-        updates[`rooms/${roomId}/game/deck`] = deck;
-        updates[`rooms/${roomId}/players/${nextPlayerId}/hand`] = nextHand;
-        updates[`rooms/${roomId}/players/${nextPlayerId}/handCount`] = nextHand.length;
-    }
-
     await update(ref(db), updates);
+}
+
+// نظام النقاط (عند انتهاء يد لاعب)
+function calculatePoints(hand) {
+    let score = 0;
+    hand.forEach(cStr => {
+        const c = parseCard(cStr);
+        if (!isNaN(c.value)) score += parseInt(c.value);
+        else if (["⊘", "↻", "+2"].includes(c.value)) score += 20;
+        else if (c.isWild) score += 50;
+    });
+    return score;
 }
 
 function isValidMove(playedStr) {
@@ -429,6 +517,19 @@ onValue(playersRef, (snap) => {
 
 onValue(gameRef, (snap) => {
     gameState = snap.val();
+    if (!gameState) return;
+
+    const stackUI = document.getElementById('stackUI');
+    const stackText = document.getElementById('stackText');
+    
+    // إظهار لوحة التراكم إذا كان دوري وهناك سحب متراكم
+    if (gameState.turnState.currentTurnId === playerId && gameState.turnState.drawStack > 0) {
+        stackUI.style.display = 'block';
+        stackText.innerText = `تراكمات السحب الموجهة إليك: +${gameState.turnState.drawStack}`;
+    } else {
+        stackUI.style.display = 'none';
+    }
+    
     renderGame();
 });
 
