@@ -197,6 +197,55 @@
         .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); }
         .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); }
         .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
+/* --- تحسينات التوهج والحدود --- */
+
+/* 1. التوهج للاعب الذي عنده الدور (يشمل الصورة والنص) */
+.player-seat.is-turn {
+    filter: drop-shadow(0 0 10px #7ed321) drop-shadow(0 0 5px #7ed321);
+    z-index: 100;
+}
+
+/* 2. الأفاتار (دائماً بحدود بيضاء مثل البقية) */
+.avatar-wrap {
+    position: relative;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    padding: 2px;
+    border: 2px solid #fff; /* حدود بيضاء ثابتة */
+    background: #333;
+    z-index: 2;
+}
+
+/* 3. مربع نص الاسم بحدود بيضاء */
+.player-name {
+    background: rgba(0,0,0,0.9);
+    padding: 2px 10px;
+    border-radius: 5px;
+    font-size: 0.65rem;
+    margin-top: -5px; /* تداخل بسيط لضمان الاتصال بصرياً */
+    z-index: 3;
+    white-space: nowrap;
+    border: 1px solid #ffffff; /* حدود بيضاء لمربع النص */
+    color: white;
+}
+
+/* 4. تمييز "أنت" (تغيير لون النص فقط داخل المربع) */
+.player-seat.is-me .player-name {
+    color: #7ed321;
+    font-weight: bold;
+    border: 1.5px solid #ffffff; /* التأكيد على الحدود البيضاء */
+}
+
+.me-tag {
+    color: #7ed321;
+    margin-right: 2px;
+}
+
+/* إلغاء أي أنيميشن نبض تماماً */
+.is-turn, .is-turn .avatar-wrap {
+    animation: none !important;
+}
 
     </style>
 </head>
@@ -273,339 +322,105 @@
 </div>
 
 <script>
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, onValue, update, get, runTransaction } 
-from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
-/* ---------------- Firebase ---------------- */
-
-const firebaseConfig = {
-    apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
-    authDomain: "uno-4ed20.firebaseapp.com",
-    databaseURL: "https://uno-4ed20-default-rtdb.firebaseio.com",
-    projectId: "uno-4ed20",
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-/* ---------------- Room Data ---------------- */
-
-const urlParams = new URLSearchParams(window.location.search);
-const roomId = urlParams.get("r");
-const playerId = urlParams.get("p");
-
-const roomRef = ref(db, `rooms/${roomId}`);
-const gameRef = ref(db, `rooms/${roomId}/game`);
-const playersRef = ref(db, `rooms/${roomId}/players`);
-const settingsRef = ref(db, `rooms/${roomId}/settings`);
-
-/* ---------------- Game State ---------------- */
-
-let localGameState = null;
-let localSettings = null;
-let playersCache = {};
-let isAdmin = false;
-let timerInterval = null;
-
-/* ---------------- Card Engine ---------------- */
-
-const colors = ["red", "blue", "green", "yellow"];
-
-function createDeck(deckCount, eraserEnabled) {
-    let deck = [];
-
-    for (let d = 0; d < deckCount; d++) {
-        colors.forEach(color => {
-            deck.push({ type: "number", value: 0, color });
-            for (let i = 1; i <= 9; i++) {
-                deck.push({ type: "number", value: i, color });
-                deck.push({ type: "number", value: i, color });
-            }
-            ["skip", "reverse", "draw2"].forEach(type => {
-                deck.push({ type, color });
-                deck.push({ type, color });
-            });
-        });
-
-        for (let i = 0; i < 4; i++) {
-            deck.push({ type: "wild" });
-            deck.push({ type: "wild4" });
-        }
-
-        if (eraserEnabled) {
-            deck.push({ type: "eraser" });
-        }
-    }
-
-    return shuffle(deck);
-}
-
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
-
-/* ---------------- Start Game (Admin Only) ---------------- */
-
-async function initializeGame() {
-    const playersSnap = await get(playersRef);
-    const settingsSnap = await get(settingsRef);
-
-    const players = Object.values(playersSnap.val())
-        .filter(p => p.slot.startsWith("slot-"))
-        .sort((a, b) => a.slot.localeCompare(b.slot));
-
-    const settings = settingsSnap.val();
-    localSettings = settings;
-
-    const deck = createDeck(settings.decks, settings.eraser);
-
-    let hands = {};
-    players.forEach(p => hands[p.id] = []);
-
-    for (let i = 0; i < settings.cards; i++) {
-        players.forEach(p => {
-            hands[p.id].push(deck.pop());
-        });
-    }
-
-    const firstCard = deck.pop();
-
-    const gameState = {
-        players: players.map(p => p.id),
-        hands,
-        deck,
-        discard: [firstCard],
-        currentPlayerIndex: Math.floor(Math.random() * players.length),
-        direction: 1,
-        stackingValue: 0,
-        unoPlayers: {},
-        finishedPlayers: [],
-        startedAt: Date.now()
-    };
-
-    await update(roomRef, { game: gameState });
-}
-
-/* ---------------- Turn Logic ---------------- */
-
-function getCurrentPlayerId() {
-    return localGameState.players[localGameState.currentPlayerIndex];
-}
-
-function nextTurn() {
-    let length = localGameState.players.length;
-    localGameState.currentPlayerIndex =
-        (localGameState.currentPlayerIndex + localGameState.direction + length) % length;
-}
-
-/* ---------------- Play Card ---------------- */
-
-window.playCard = async function(cardIndex) {
-    if (!localGameState) return;
-    if (getCurrentPlayerId() !== playerId) return;
-
-    runTransaction(gameRef, (game) => {
-        if (!game) return;
-
-        let hand = game.hands[playerId];
-        const card = hand[cardIndex];
-        const topCard = game.discard[game.discard.length - 1];
-
-        if (!isValidMove(card, topCard, game.stackingValue)) return;
-
-        hand.splice(cardIndex, 1);
-        game.discard.push(card);
-
-        applyEffect(game, card);
-
-        if (hand.length === 1) {
-            game.unoPlayers[playerId] = true;
-        }
-
-        if (hand.length === 0) {
-            game.finishedPlayers.push(playerId);
-        }
-
-        nextTurnGame(game);
-        return game;
-    });
-};
-
-function isValidMove(card, topCard, stackingValue) {
-    if (stackingValue > 0) {
-        return card.type === "draw2" || card.type === "wild4";
-    }
-    if (card.type === "wild" || card.type === "wild4") return true;
-    if (card.color && card.color === topCard.color) return true;
-    if (card.value !== undefined && card.value === topCard.value) return true;
-    if (card.type === topCard.type) return true;
-    return false;
-}
-
-function applyEffect(game, card) {
-    if (card.type === "reverse") {
-        game.direction *= -1;
-    }
-    if (card.type === "skip") {
-        nextTurnGame(game);
-    }
-    if (card.type === "draw2") {
-        game.stackingValue += 2;
-    }
-    if (card.type === "wild4") {
-        game.stackingValue += 4;
-    }
-}
-
-function nextTurnGame(game) {
-    let length = game.players.length;
-    game.currentPlayerIndex =
-        (game.currentPlayerIndex + game.direction + length) % length;
-}
-
-/* ---------------- Draw Card ---------------- */
-
-window.drawCard = async function() {
-    runTransaction(gameRef, (game) => {
-        if (!game) return;
-        if (getCurrentPlayerId() !== playerId) return;
-
-        if (game.deck.length === 0) {
-            let top = game.discard.pop();
-            game.deck = shuffle(game.discard);
-            game.discard = [top];
-        }
-
-        let drawCount = game.stackingValue > 0 ? game.stackingValue : 1;
-
-        for (let i = 0; i < drawCount; i++) {
-            game.hands[playerId].push(game.deck.pop());
-        }
-
-        game.stackingValue = 0;
-        nextTurnGame(game);
-        return game;
-    });
-};
-
-/* ---------------- UNO Button ---------------- */
-
-document.querySelector(".uno-btn").onclick = () => {
-    runTransaction(gameRef, (game) => {
-        if (!game) return;
-        game.unoPlayers[playerId] = true;
-        return game;
-    });
-};
-
-/* ---------------- Rendering ---------------- */
-
-function renderGame(game) {
-    const myHand = document.getElementById("myHand");
-    myHand.innerHTML = "";
-
-    game.hands[playerId].forEach((card, i) => {
-        const div = document.createElement("div");
-        div.className = `card ${card.color || 'wild'}`;
-        div.onclick = () => playCard(i);
-        myHand.appendChild(div);
-    });
-
-    document.getElementById("directionIndicator").innerText =
-        game.direction === 1 ? "↻" : "↺";
-
-    highlightCurrentPlayer(game);
-}
-
-function highlightCurrentPlayer(game) {
-    const currentId = game.players[game.currentPlayerIndex];
-    document.querySelectorAll(".player-seat").forEach(seat => {
-        seat.classList.remove("active-turn");
-    });
-    if (currentId !== playerId) {
-        const index = game.players.indexOf(currentId);
-        const seat = document.querySelector(`.slot-${index+1}`);
-        if (seat) seat.classList.add("active-turn");
-    }
-}
-
-/* ---------------- Listeners ---------------- */
-
-onValue(playersRef, (snap) => {
-    playersCache = snap.val() || {};
-    const sorted = Object.values(playersCache).sort((a,b)=>a.joinedAt-b.joinedAt);
-    isAdmin = sorted[0]?.id === playerId;
-});
-
-onValue(gameRef, (snap) => {
-    if (!snap.exists()) {
-        if (isAdmin) initializeGame();
-        return;
-    }
-    localGameState = snap.val();
-    renderGame(localGameState);
-});
-function layoutPlayers(playersArray) {
+function layoutPlayers(playersData, myId, currentTurnId) {
     const container = document.getElementById('playersContainer');
     container.innerHTML = '';
-
-    const totalPlayers = playersArray.length + 1; // +1 لأنك محسوب
-
+    
+    // تحويل الكائن إلى مصفوفة لسهولة التعامل معها
+    const playersArray = Object.values(playersData);
+    const totalPlayers = playersArray.length;
+    
+    // إعدادات التوزيع الأصلية الخاصة بك
     const configs = {
-        2:  { right: 1, top: 0, left: 0 },
-        3:  { right: 1, top: 1, left: 0 },
-        4:  { right: 1, top: 1, left: 1 },
-        5:  { right: 2, top: 1, left: 1 },
-        6:  { right: 2, top: 2, left: 1 },
+        1:  { right: 0, top: 0, left: 0 }, // حالة لاعب واحد (اختبار)
+        2:  { right: 1, top: 0, left: 1 },
+        3:  { right: 1, top: 1, left: 1 },
+        4:  { right: 2, top: 0, left: 2 },
+        5:  { right: 2, top: 1, left: 2 },
+        6:  { right: 2, top: 2, left: 2 },
+        7:  { right: 2, top: 3, left: 2 },
+        8:  { right: 3, top: 2, left: 3 },
+        9:  { right: 3, top: 3, left: 3 },
+        10: { right: 4, top: 2, left: 4 }
     };
 
-    const config = configs[totalPlayers] || configs[2];
+    const config = configs[totalPlayers] || configs[7];
     let positions = [];
 
-    for(let i=0; i<config.right; i++) {
-        positions.push({ side: 'right', top: (100/(config.right+1)) * (i+1) });
+    // التوزيع عكس عقارب الساعة (نفس ترتيبك الأخير)
+    // 1. اليسار: من الأسفل صعوداً
+    for(let i = config.left - 1; i >= 0; i--) {
+        positions.push({ side: 'left', top: (100 / (config.left + 1)) * (i + 1) });
+    }
+    // 2. الأعلى: من اليسار إلى اليمين
+    for(let i = 0; i < config.top; i++) {
+        positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) });
+    }
+    // 3. اليمين: من الأعلى نزولاً
+    for(let i = 0; i < config.right; i++) {
+        positions.push({ side: 'right', top: (100 / (config.right + 1)) * (i + 1) });
     }
 
-    for(let i=0; i<config.top; i++) {
-        positions.push({ side: 'top', left: (100/(config.top+1)) * (i+1) });
-    }
-
-    for(let i=0; i<config.left; i++) {
-        positions.push({ side: 'left', top: (100/(config.left+1)) * (i+1) });
-    }
-
+    // رسم اللاعبين بناءً على البيانات القادمة
     playersArray.forEach((player, idx) => {
+        if (!positions[idx]) return; // حماية في حال زاد عدد اللاعبين عن المواقع
+
+        const isMe = (player.id === myId); 
+        const hasTurn = (player.id === currentTurnId);
         const pos = positions[idx];
-        if(!pos) return;
-
+        
         const seat = document.createElement('div');
-        seat.className = 'player-seat';
-
-        if(pos.side === 'right')
-            seat.style.cssText = `top:${pos.top}%;right:15px;transform:translateY(-50%)`;
-        if(pos.side === 'left')
-            seat.style.cssText = `top:${pos.top}%;left:15px;transform:translateY(-50%)`;
-        if(pos.side === 'top')
-            seat.style.cssText = `top:20px;left:${pos.left}%;transform:translateX(-50%)`;
+        // استخدام slot القادم من البيانات للألوان، و is-me / is-turn للتمييز
+        seat.className = `player-seat ${player.slot} ${isMe ? 'is-me' : ''} ${hasTurn ? 'is-turn' : ''}`;
+        
+        let style = "";
+        if(pos.side === 'right') style = `top: ${pos.top}%; right: 15px; transform: translateY(-50%);`;
+        if(pos.side === 'left')  style = `top: ${pos.top}%; left: 15px; transform: translateY(-50%);`;
+        if(pos.side === 'top')   style = `top: 20px; left: ${pos.left}%; transform: translateX(-50%);`;
+        
+        seat.style.cssText = style;
 
         seat.innerHTML = `
             <div class="avatar-wrap">
                 <img src="${player.avatar}">
-                <div class="card-count-badge">7</div>
+                <div class="card-count-badge">${player.handCount}</div>
             </div>
-            <div class="player-name">${player.name}</div>
+            <div class="player-name">
+                ${player.name} ${isMe ? '<span class="me-tag">(أنت)</span>' : ''}
+            </div>
         `;
-
         container.appendChild(seat);
     });
-}
-layoutPlayers(Object.keys(roomData.players).length);
-</script>
 
+    // تحديث عداد اللاعبين في الأعلى (اختياري)
+    const countEl = document.getElementById('playerCount');
+    if(countEl) countEl.innerText = totalPlayers;
+}
+
+// --- مثال لكيفية تشغيل الدالة ببياناتك ---
+const dataFromDB = {
+    "players": {
+        "mfntf9": {
+            "avatar": "img/avatar/pizza_guy.webp",
+            "id": "mfntf9",
+            "name": "abdo",
+            "slot": "slot-0",
+            "handCount": 7
+        },
+        "xg4yr5": {
+            "avatar": "img/avatar/snowman.webp",
+            "id": "xg4yr5",
+            "name": "salem",
+            "slot": "slot-1",
+            "handCount": 5
+        }
+    }
+};
+
+// تشغيل: اللاعب هو "abdo" والدور حالياً على "salem"
+layoutPlayers(dataFromDB.players, "mfntf9", "xg4yr5");
+
+</script>
 </body>
 </html>

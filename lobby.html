@@ -414,9 +414,9 @@
                 <input type="range" min="0" max="3" value="0" id="timerSlider" style="width:100%;margin-top:20px;" oninput="changeTimer(this.value)">
                 <div class="slider-labels">
                     <span id="label0" class="active-label">بدون</span>
-                    <span id="label1">30ث</span>
-                    <span id="label2">1د</span>
-                    <span id="label3">2د</span>
+                    <span id="label1">5ث</span>
+                    <span id="label2">15ث</span>
+                    <span id="label3">30ث</span>
                 </div>
                 <button class="save-btn" style="background:#444;" onclick="document.getElementById('timerModal').style.display='none'">إغلاق</button>
             </div>
@@ -449,10 +449,9 @@
 <script type="module">
 /* ---------- 1. Setup & Config ---------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, onDisconnect, update, runTransaction, remove, get } 
+import { getDatabase, ref, set, onValue, onDisconnect, update, runTransaction, remove, get, serverTimestamp } 
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
-// إعدادات فايربيس الجديدة الخاصة بـ UNO
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
     authDomain: "uno-4ed20.firebaseapp.com",
@@ -497,7 +496,7 @@ let myData = {
     id: playerId,
     name: "",
     avatar: "img/avatar/snowman.webp",
-    slot: "spectators", // الافتراضي: متفرج (spectators) أو رقم الخانة (slot-0, slot-1...)
+    slot: "spectators",
     joinedAt: Date.now()
 };
 
@@ -578,8 +577,6 @@ async function autoJoinRoom() {
     }
     
     await update(myPlayerRef, { ...myData, lastActive: now, joinedAt: now });
-    // عند الانقطاع عن الاتصال، احذف اللاعب من الغرفة
-    onDisconnect(myPlayerRef).remove();
     startHeartbeat();
 }
 
@@ -600,7 +597,21 @@ window.saveProfile = async () => {
         id: playerId, name: myData.name, avatar: myData.avatar
     });
 
-    await autoJoinRoom();
+    hasJoined = true;
+    const now = Date.now();
+    
+    if (!roomSnap.exists()) {
+        await set(roomRef, { 
+            lastActivity: now, 
+            status: "lobby", 
+            settings: defaultSettings 
+        });
+    } else {
+        updateRoomActivity();
+    }
+    
+    await update(myPlayerRef, { ...myData, lastActive: now,});
+    startHeartbeat();
 };
 
 window.openProfileSettings = () => {
@@ -857,7 +868,7 @@ window.toggleSetting = (type, isChecked) => {
 window.openTimerModal = () => { if (isAdmin) document.getElementById('timerModal').style.display = 'flex'; };
 window.changeTimer = (val) => {
     if (!isAdmin) return;
-    const secondsMap = [0, 30, 60, 120];
+    const secondsMap = [0, 5, 15, 30];
     update(settingsRef, { timer: secondsMap[val] });
     updateRoomActivity();
 };
@@ -918,9 +929,9 @@ onValue(settingsRef, (snapshot) => {
     let label = "بدون", icon = "🚫", displayStr = "";
     
     if (seconds > 0) {
-        icon = seconds === 30 ? "⚡" : (seconds === 60 ? "⏱️" : "🐢");
+        icon = seconds === 5 ? "⚡" : (seconds === 15 ? "⏱️" : "🐢");
         label = seconds < 60 ? `${seconds} ثانية` : `${seconds / 60} دقيقة`;
-        displayStr = seconds === 30 ? "00:30" : (seconds === 60 ? "01:00" : "02:00");
+        displayStr = seconds === 5 ? "00:05" : (seconds === 15 ? "00:15" : "00:30");
         if(displayTimer) displayTimer.style.display = 'block';
     } else { 
         if(displayTimer) displayTimer.style.display = 'none'; 
@@ -933,7 +944,7 @@ onValue(settingsRef, (snapshot) => {
     if(displayTimer) displayTimer.innerText = displayStr;
 
     const timerSlider = document.getElementById('timerSlider');
-    const valMap = { 0: 0, 30: 1, 60: 2, 120: 3 };
+    const valMap = { 0: 0, 5: 1, 15: 2, 30: 3 };
     if(timerSlider) timerSlider.value = valMap[seconds] || 0;
 });
 
@@ -963,29 +974,145 @@ onValue(playersRef, (snapshot) => {
 
 
 /* ---------- 7. Game Engine & Start ---------- */
+// دالة إنشاء مصفوفة الأوراق
+function createUnoDeck(numDecks = 1, includeEraser = false) {
+    const colors = ["red", "blue", "green", "yellow"];
+    const numbers = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+    const actionTypes = ["Skip", "Reverse", "DrawTwo"];
+    const deck = [];
+
+    for (let d = 0; d < numDecks; d++) {
+        colors.forEach(color => {
+            deck.push(`${color}${numbers[0]}`);
+            for (let i = 1; i <= 9; i++) {
+                deck.push(`${color}${numbers[i]}`, `${color}${numbers[i]}`);
+            }
+            actionTypes.forEach(action => {
+                deck.push(`${color}${action}`, `${color}${action}`);
+            });
+        });
+
+        for (let i = 0; i < 4; i++) {
+            deck.push("wildColor", "wildDrawFour");
+        }
+
+        if (includeEraser) {
+            deck.push("Eraser");
+        }
+    }
+    return deck;
+}
 window.handleStartGame = async () => {
     if (!isAdmin) return;
 
-    const playersSnap = await get(playersRef);
-    const players = playersSnap.val() || {};
-    const playerList = Object.values(players);
+    // 1. جلب بيانات اللاعبين والإعدادات
+    const [playersSnap, settingsSnap] = await Promise.all([
+        get(playersRef),
+        get(settingsRef)
+    ]);
+
+    const playersData = playersSnap.val() || {};
+    const settings = settingsSnap.val() || defaultSettings;
     
-    // فلترة اللاعبين الموجودين في الخانات فقط (تجاهل الجمهور)
-    const activePlayers = playerList.filter(p => p.slot.startsWith('slot-'));
+    // 2. فلترة اللاعبين الفعليين (الخانات فقط) وترتيبهم حسب رقم الـ Slot
+    let activePlayers = Object.values(playersData)
+        .filter(p => p.slot.startsWith('slot-'))
+        .sort((a, b) => {
+            const slotA = parseInt(a.slot.split('-')[1]);
+            const slotB = parseInt(b.slot.split('-')[1]);
+            return slotA - slotB;
+        });
 
     if (activePlayers.length < 2) {
         return showToast("⚠️ يجب أن ينضم لاعبان على الأقل للبدء");
     }
 
-    // هنا سيتم تجهيز أوراق الأونو لاحقاً وإرسالها لـ Firebase
-    // حالياً سنكتفي بتغيير حالة الغرفة للانتقال لصفحة اللعب
-    
-    await update(roomRef, { 
-        status: "started",
-        startedAt: Date.now()
-    });
-};
+    // إظهار شاشة تحميل للآدمن ريثما يتم تجهيز اللعبة
+    document.getElementById('startBtn').innerText = "جاري التجهيز...";
+    document.getElementById('startBtn').disabled = true;
 
+    // 3. إنشاء وخلط الأوراق
+    let deck = createUnoDeck(settings.decks, settings.eraser);
+    shuffleArray(deck);
+
+    // 4. توزيع الأوراق على اللاعبين
+    let hands = {};
+    activePlayers.forEach(p => {
+        hands[p.id] = [];
+        for (let i = 0; i < settings.cards; i++) {
+            hands[p.id].push(deck.pop());
+        }
+    });
+
+    // 5. تحديد الورقة الأولى في كومة اللعب
+    let firstCard = null;
+    let tempDeck = [];
+    while (deck.length > 0) {
+        let card = deck.pop();
+        // منع بدء اللعبة ببطاقة سحب 4 أو ماسح (لأنها ستكسر المنطق)
+        if (card === "wildDrawFour" || card === "Eraser") {
+            tempDeck.push(card);
+        } else {
+            firstCard = card;
+            break;
+        }
+    }
+    // إعادة البطاقات المستبعدة للكومة وخلطها مجدداً
+    deck.push(...tempDeck);
+    shuffleArray(deck);
+
+    // 6. تجهيز حالة اللعبة (Game State)
+    // تحديد اللاعب الذي سيبدأ عشوائياً
+    const startingPlayerIndex = Math.floor(Math.random() * activePlayers.length);
+    const startingPlayerId = activePlayers[startingPlayerIndex].id;
+
+    // تحديد الاتجاه الافتراضي (إذا كانت الورقة الأولى عكس، نعكس الاتجاه)
+    let initialDirection = firstCard.includes("Reverse") ? -1 : 1;
+
+    // إذا كانت الورقة الأولى "تغيير لون"، نختار لون عشوائي للبدء لتسهيل اللعب
+    let initialSelectedColor = "";
+    if (firstCard === "wildColor") {
+        const colors = ["red", "blue", "green", "yellow"];
+        initialSelectedColor = colors[Math.floor(Math.random() * 4)];
+    }
+
+    const gameState = {
+        deck: deck, // كومة السحب
+        discardPile: [firstCard], // كومة اللعب
+        turnState: {
+            currentTurnId: startingPlayerId,
+            direction: initialDirection, // 1 مع عقارب الساعة، -1 عكس
+            drawStack: 0, // عداد السحب المتراكم
+            selectedColor: initialSelectedColor, 
+            lastUpdated: serverTimestamp() // لضمان التزامن
+        }
+    };
+
+    // 7. تجميع كل التحديثات في كائن واحد لرفعها دفعة واحدة (Atomic Update)
+    let updates = {};
+    
+    // تحديث أوراق كل لاعب
+    activePlayers.forEach(p => {
+        updates[`rooms/${roomId}/players/${p.id}/hand`] = hands[p.id];
+        updates[`rooms/${roomId}/players/${p.id}/handCount`] = hands[p.id].length;
+    });
+
+    // رفع حالة اللعبة وتغيير حالة الغرفة
+    updates[`rooms/${roomId}/game`] = gameState;
+    updates[`rooms/${roomId}/status`] = "started";
+    updates[`rooms/${roomId}/startedAt`] = serverTimestamp();
+
+    // 8. إرسال البيانات للفايربيس
+    try {
+        await update(ref(db), updates);
+        // سيقوم مستمع الـ onValue(roomRef) بنقل الجميع لصفحة اللعب تلقائياً
+    } catch (error) {
+        console.error("Error generating game state:", error);
+        showToast("حدث خطأ أثناء تجهيز اللعبة!");
+        document.getElementById('startBtn').innerText = "بدء اللعبة";
+        document.getElementById('startBtn').disabled = false;
+    }
+};
 onValue(roomRef, (snap) => {
     const data = snap.val();
     if (data?.status === "started") {
@@ -1030,5 +1157,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 document.getElementById('nicknameInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') saveProfile(); });
 
 vacuumCleaner();
-</script></body>
+</script>
+</body>
 </html>
