@@ -54,39 +54,61 @@
         .player-name { background: rgba(0,0,0,0.9); padding: 2px 10px; border-radius: 5px; font-size: 0.65rem; margin-top: -5px; z-index: 3; white-space: nowrap; border: 1px solid #ffffff; color: white; }
         .card-count-badge { position: absolute; top: -5px; right: -5px; background: #ffaa00; color: black; font-weight: bold; font-size: 0.7rem; width: 20px; height: 20px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .player-seat.is-turn { filter: drop-shadow(0 0 10px #7ed321) drop-shadow(0 0 5px #7ed321); z-index: 100; }
-        .player-seat.is-me .player-name { color: #7ed321; font-weight: bold; }
 
-        /* --- 4. Your Hand & Controls --- */
-        .bottom-controls { height: 160px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); display: flex; flex-direction: column; align-items: center; padding: 10px; border-top: 1px solid #333; position: relative; }
-        .my-hand { width: 100%; display: flex; justify-content: center; align-items: flex-end; height: 90%; gap: -20px; overflow-x: auto; padding: 10px; scrollbar-width: none; }
-        .my-hand::-webkit-scrollbar { display: none; }
-
-        /* Stacking UI (تنبيه التراكم) */
+        /* --- 4. Stacking Alert (التراكم) --- */
         .stacking-alert {
-            position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%);
             background: rgba(20, 0, 0, 0.95); border: 2px solid var(--uno-red);
-            padding: 8px 15px; border-radius: 20px; display: none; /* مخفي افتراضياً */
-            align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(255,0,0,0.4); z-index: 150;
+            padding: 8px 15px; border-radius: 20px; display: none;
+            align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(255,0,0,0.6); z-index: 200;
+            animation: bounceIn 0.5s ease;
+        }
+        @keyframes bounceIn {
+            0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
+            70% { transform: translateX(-50%) scale(1.1); }
+            100% { transform: translateX(-50%) scale(1); opacity: 1; }
         }
         .stacking-alert span { color: white; font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
         .accept-stack-btn {
             background-color: var(--uno-red); color: white; border: 1px solid #fff;
-            padding: 6px 12px; border-radius: 10px; font-weight: bold; font-size: 0.75rem;
-            cursor: pointer; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            padding: 6px 14px; border-radius: 12px; font-weight: bold; font-size: 0.75rem;
+            cursor: pointer; transition: 0.2s;
         }
-        .accept-stack-btn:active { transform: scale(0.95); }
 
-        #colorPicker { position: absolute; top: -70px; background: rgba(0,0,0,0.9); padding: 10px 20px; border-radius: 15px; border: 1px solid #444; display: none; gap: 10px; z-index: 1000; box-shadow: 0 5px 20px rgba(0,0,0,0.8); }
-        .color-btn { width: 45px; height: 45px; border-radius: 10px; border: 2px solid white; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-        .color-btn:active { transform: scale(0.9); }
+        /* --- 5. Bottom Controls & Hand --- */
+        .bottom-controls { height: 160px; background: rgba(0,0,0,0.7); backdrop-filter: blur(15px); display: flex; flex-direction: column; align-items: center; padding: 5px; border-top: 1px solid #333; position: relative; z-index: 150; }
+        
+        .my-hand { 
+            width: 100%; display: flex; justify-content: center; align-items: flex-end; 
+            height: 120px; padding: 0 20px 10px 20px; 
+            /* لإبقاء البطاقات في سطر واحد وتداخلها */
+            overflow-x: visible; 
+        }
 
-        /* --- 5. البطاقات --- */
-        .card { min-width: 65px; width: 65px; height: 95px; border-radius: 8px; border: 3px solid #e0e0e0; position: relative; display: flex; justify-content: center; align-items: center; box-shadow: -3px 0 10px rgba(0,0,0,0.5); transition: 0.2s; cursor: pointer; overflow: hidden; margin-left: -25px; }
+        /* البطاقة وتأثير الزحام */
+        .card { 
+            min-width: 65px; width: 65px; height: 95px; border-radius: 8px; 
+            border: 2.5px solid #e0e0e0; position: relative; display: flex; 
+            justify-content: center; align-items: center; box-shadow: -2px 0 8px rgba(0,0,0,0.6); 
+            transition: transform 0.2s ease, margin 0.2s ease; cursor: pointer; 
+            overflow: hidden; background-color: white;
+            margin-left: -35px; /* تداخل البطاقات */
+        }
+        .card:first-child { margin-left: 0; }
+
+        /* تأثير الهوفر لإبراز البطاقة */
+        .card:hover { 
+            transform: translateY(-25px) scale(1.1); 
+            z-index: 500 !important; 
+            margin-right: 15px; /* توسيع مساحة للبطاقة البارزة */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
+        }
+
         .discard-pile .card { margin: 0; width: 100%; height: 100%; border-width: 3px; }
         .inner-oval { width: 115%; height: 75%; background-color: white; border-radius: 50%; transform: rotate(-45deg); position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1; }
-        .symbol { font-weight: bold; transform: rotate(45deg); z-index: 2; font-size: 35px; }
-        .corner-number { position: absolute; font-size: 10px; font-weight: bold; color: white; z-index: 2; }
-        .top-left { top: 2px; left: 2px; } .bottom-right { bottom: 2px; right: 2px;}
+        .symbol { font-weight: bold; transform: rotate(45deg); z-index: 2; font-size: 32px; }
+        .corner-number { position: absolute; font-size: 11px; font-weight: bold; color: white; z-index: 2; }
+        .top-left { top: 3px; left: 4px; } .bottom-right { bottom: 3px; right: 4px;}
 
         .red { background-color: var(--uno-red); } .red .symbol { color: var(--uno-red); }
         .blue { background-color: var(--uno-blue); } .blue .symbol { color: var(--uno-blue); }
@@ -94,17 +116,20 @@
         .green { background-color: var(--uno-green); } .green .symbol { color: var(--uno-green); }
         .wild { background-color: #111; } .wild .inner-oval { background: linear-gradient(45deg, var(--uno-red) 25%, var(--uno-blue) 25%, var(--uno-blue) 50%, var(--uno-yellow) 50%, var(--uno-yellow) 75%, var(--uno-green) 75%); } .wild .symbol { color: white; font-size: 18px; }
 
-        .my-hand .card:hover { transform: translateY(-20px); z-index: 100 !important; }
-        
-        .uno-btn { position: absolute; right: 15px; top: -30px; width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000); border-radius: 50%; border: 3px solid #fff; color: white; font-weight: 900; font-size: 0.7rem; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; }
-        
-        /* تدرجات Slots */
-        .slot-0 .avatar-wrap { background: linear-gradient(135deg, #7b241c, #e74c3c); } .slot-1 .avatar-wrap { background: linear-gradient(135deg, #154360, #3498db); } .slot-2 .avatar-wrap { background: linear-gradient(135deg, #145a32, #2ecc71); } .slot-3 .avatar-wrap { background: linear-gradient(135deg, #7e5109, #f1c40f); } .slot-4 .avatar-wrap { background: linear-gradient(135deg, #6e2c00, #e67e22); } .slot-5 .avatar-wrap { background: linear-gradient(135deg, #4a235a, #9b59b6); } .slot-6 .avatar-wrap { background: linear-gradient(135deg, #641e16, #ec407a); } .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); } .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); } .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
+        #colorPicker { position: absolute; top: -80px; background: rgba(0,0,0,0.9); padding: 12px; border-radius: 15px; border: 1px solid #555; display: none; gap: 10px; z-index: 1000; }
+        .color-btn { width: 45px; height: 45px; border-radius: 8px; border: 2px solid white; cursor: pointer; }
+
+        .uno-btn { position: absolute; right: 10px; top: -35px; width: 55px; height: 55px; background: radial-gradient(#ff0000, #990000); border-radius: 50%; border: 3px solid #fff; color: white; font-weight: 900; font-size: 0.65rem; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 160; }
     </style>
 </head>
 <body>
 
 <div class="mobile-wrapper">
+    <div id="stackingAlert" class="stacking-alert">
+        <span>تراكمات السحب الموجهه إليك: +<span id="stackingAmount">0</span></span>
+        <button class="accept-stack-btn" onclick="acceptDrawStack()">اسحب وتخطي الدور</button>
+    </div>
+
     <div class="top-bar">
         <div class="top-left"><div class="icon-circle"><span id="playerCount">0</span> 👤</div><div class="btn-pill" id="roomDisplay">🔗 الغرفة</div></div>
         <div class="top-timer" id="gameTimer"></div>
@@ -121,11 +146,6 @@
     </div>
 
     <div class="bottom-controls">
-        <div id="stackingAlert" class="stacking-alert">
-            <span>تراكمات السحب الموجهه إليك: +<span id="stackingAmount">0</span></span>
-            <button class="accept-stack-btn" onclick="acceptDrawStack()">اسحب وتخطي الدور</button>
-        </div>
-
         <div id="colorPicker">
             <div class="color-btn red" onclick="selectColor('red')"></div>
             <div class="color-btn blue" onclick="selectColor('blue')"></div>
@@ -192,7 +212,6 @@ function createCardElement(cardStr, zIndex, onClickAction) {
     return div;
 }
 
-// دالة خلط المصفوفة
 function shuffleArray(array) {
     let newArr = [...array];
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -202,7 +221,6 @@ function shuffleArray(array) {
     return newArr;
 }
 
-// دالة سحب البطاقات مع معالجة إعادة الخلط
 function extractCardsToDraw(count, currentDeck, currentDiscard) {
     let drawnCards = [];
     let deck = [...(currentDeck || [])];
@@ -210,7 +228,7 @@ function extractCardsToDraw(count, currentDeck, currentDiscard) {
 
     for (let i = 0; i < count; i++) {
         if (deck.length === 0) {
-            if (discard.length <= 1) break; // لا يوجد بطاقات كافية للخلط
+            if (discard.length <= 1) break;
             const topCard = discard.pop();
             deck = shuffleArray(discard);
             discard = [topCard];
@@ -240,12 +258,18 @@ function renderGame() {
 
     const handContainer = document.getElementById('myHand');
     handContainer.innerHTML = '';
+    
+    // تعديل الهامش ليتناسب مع عدد البطاقات (كلما زاد العدد زاد التداخل)
+    const cardCount = myHand.length;
+    const overlap = cardCount > 10 ? -45 : -35; 
+
     myHand.forEach((cardStr, index) => {
         const action = (currentTurnId === playerId) ? () => handlePlayCard(cardStr, index) : null;
-        handContainer.appendChild(createCardElement(cardStr, index + 1, action));
+        const cardEl = createCardElement(cardStr, index + 1, action);
+        if (index > 0) cardEl.style.marginLeft = `${overlap}px`;
+        handContainer.appendChild(cardEl);
     });
 
-    // إظهار التراكم إذا كان مفعلاً
     const stackingAlert = document.getElementById('stackingAlert');
     const drawStack = gameState.turnState.drawStack || 0;
     const isStackingEnabled = gameState.settings ? gameState.settings.stacking : true;
@@ -281,17 +305,12 @@ function isValidMove(playedStr) {
     const activeCol = gameState.turnState.selectedColor || top.color;
     const drawStack = gameState.turnState.drawStack || 0;
 
-    // إذا كان هناك تراكم، يجب اللعب بـ +2 أو +4 فقط
-    if (drawStack > 0) {
-        return (played.value === "+2" || played.value === "+4");
-    }
-
+    if (drawStack > 0) return (played.value === "+2" || played.value === "+4");
     return played.isWild || played.color === activeCol || played.value === top.value;
 }
 
 async function handlePlayCard(cardStr, cardIndex) {
     if (!isValidMove(cardStr)) return alert("لا يمكنك لعب هذه البطاقة!");
-
     const card = parseCard(cardStr);
     if (card.isWild) {
         pendingWildCard = { cardStr, cardIndex };
@@ -329,20 +348,15 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
 
-    // معالجة السحب المباشر إذا كان التراكم مغلقاً
     if (addedStack > 0 && !isStackingEnabled) {
-        nextPlayerId = getNextPlayerId(true, nextDirection); // تخطي اللاعب المنسحب عليه
-        const targetPlayerId = getNextPlayerId(false, nextDirection); // اللاعب المستهدف للسحب
-
+        nextPlayerId = getNextPlayerId(true, nextDirection);
+        const targetPlayerId = getNextPlayerId(false, nextDirection);
         const drawRes = extractCardsToDraw(newDrawStack, deck, discardPile);
-        deck = drawRes.deck;
-        discardPile = drawRes.discard;
-        
+        deck = drawRes.deck; discardPile = drawRes.discard;
         let targetHand = (playersData[targetPlayerId].hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetPlayerId}/hand`] = targetHand;
         updates[`rooms/${roomId}/players/${targetPlayerId}/handCount`] = targetHand.length;
-        
-        newDrawStack = 0; // تصفير التراكم لأنه نُفذ فوراً
+        newDrawStack = 0;
     }
 
     updates[`rooms/${roomId}/game/deck`] = deck;
@@ -351,22 +365,16 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
         currentTurnId: nextPlayerId, direction: nextDirection, selectedColor: chosenColor,
         drawStack: newDrawStack, lastUpdated: serverTimestamp()
     };
-
     await update(ref(db), updates);
 }
 
-// دالة قبول التراكم والسحب (مربوطة بالزر الأحمر)
 window.acceptDrawStack = async function() {
     if (gameState.turnState.currentTurnId !== playerId) return;
     const drawCount = gameState.turnState.drawStack;
-    if (!drawCount || drawCount <= 0) return;
-
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
-
     const drawRes = extractCardsToDraw(drawCount, deck, discardPile);
     myHand = myHand.concat(drawRes.drawnCards);
-
     const updates = {};
     updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
@@ -375,30 +383,22 @@ window.acceptDrawStack = async function() {
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
     updates[`rooms/${roomId}/game/turnState/drawStack`] = 0;
     updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
-
     await update(ref(db), updates);
 };
 
-// السحب العادي مع الخلط التلقائي
 document.getElementById('deckPile').onclick = async () => {
     if (gameState.turnState.currentTurnId !== playerId) return alert("ليس دورك!");
     if (gameState.turnState.drawStack > 0) return alert("اضغط على (اسحب وتخطي الدور) لإنهاء التراكمات!");
-
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
-
     const drawRes = extractCardsToDraw(1, deck, discardPile);
-    if (drawRes.drawnCards.length === 0) return alert("لا توجد بطاقات كافية!");
-    
     myHand.push(drawRes.drawnCards[0]);
-
     const updates = {};
     updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
-    
     await update(ref(db), updates);
 };
 
@@ -409,17 +409,14 @@ onValue(playersRef, (snap) => {
     renderGame();
 });
 
-onValue(gameRef, (snap) => {
-    gameState = snap.val();
-    renderGame();
-});
+onValue(gameRef, (snap) => { gameState = snap.val(); renderGame(); });
 
 window.layoutPlayers = function(playersData, myId, currentTurnId) {
     const container = document.getElementById('playersContainer');
     container.innerHTML = '';
     const playersArray = Object.values(playersData).filter(p => p.slot?.startsWith('slot-'));
-    const configs = { 1:{r:0,t:0,l:0}, 2:{r:1,t:0,l:1}, 3:{r:1,t:1,l:1}, 4:{r:2,t:0,l:2}, 5:{r:2,t:1,l:2}, 6:{r:2,t:2,l:2}, 7:{r:2,t:3,l:2}, 8:{r:3,t:2,l:3}, 9:{r:3,t:3,l:3}, 10:{r:4,t:2,l:4} };
-    const config = configs[playersArray.length] || configs[7];
+    const configs = { 2:{r:1,t:0,l:1}, 3:{r:1,t:1,l:1}, 4:{r:2,t:0,l:2}, 10:{r:4,t:2,l:4} };
+    const config = configs[playersArray.length] || configs[10];
     let positions = [];
     for(let i=config.l-1; i>=0; i--) positions.push({s:'left', t:(100/(config.l+1))*(i+1)});
     for(let i=0; i<config.t; i++) positions.push({s:'top', l:(100/(config.t+1))*(i+1)});
@@ -431,10 +428,9 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         const seat = document.createElement('div');
         seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId?'is-turn':''}`;
         seat.style.cssText = pos.s==='right'?`top:${pos.t}%;right:15px;transform:translateY(-50%);`:pos.s==='left'?`top:${pos.t}%;left:15px;transform:translateY(-50%);`:`top:20px;left:${pos.l}%;transform:translateX(-50%);`;
-        seat.innerHTML = `<div class="avatar-wrap"><img src="${p.avatar}"><div class="card-count-badge">${p.handCount||0}</div></div><div class="player-name">${p.name}${p.id===myId?' <span class="me-tag">(أنت)</span>':''}</div>`;
+        seat.innerHTML = `<div class="avatar-wrap"><img src="${p.avatar}"><div class="card-count-badge">${p.handCount||0}</div></div><div class="player-name">${p.name}</div>`;
         container.appendChild(seat);
     });
-    document.getElementById('playerCount').innerText = playersArray.length;
 }
 </script>
 </body>
