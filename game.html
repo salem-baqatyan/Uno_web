@@ -58,12 +58,15 @@
 
         /* --- 4. Your Hand & Controls --- */
         .bottom-controls { height: 160px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); display: flex; flex-direction: column; align-items: center; padding: 10px; border-top: 1px solid #333; position: relative; }
-.my-hand { width: 100%; display: flex; justify-content: center; align-items: flex-end; height: 90%; padding: 10px 20px 10px 40px; overflow-x: auto; scrollbar-width: none; }
+.my-hand { 
+    width: 100%; display: flex; justify-content: center; align-items: flex-end; 
+    height: 100%; padding: 0 20px; overflow: visible; /* سمحنا بالظهور خارج الحدود للهوفر */
+}
         .my-hand::-webkit-scrollbar { display: none; }
 
         /* Stacking UI (تنبيه التراكم) */
         .stacking-alert {
-            position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+position: absolute; top: 0; left: 50%; transform: translate(-50%, -100%);
             background: rgba(20, 0, 0, 0.95); border: 2px solid var(--uno-red);
             padding: 8px 15px; border-radius: 20px; display: none; /* مخفي افتراضياً */
             align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(255,0,0,0.4); z-index: 150;
@@ -81,7 +84,12 @@
         .color-btn:active { transform: scale(0.9); }
 
         /* --- 5. البطاقات --- */
-.card { min-width: 65px; width: 65px; height: 95px; border-radius: 8px; border: 3px solid #e0e0e0; position: relative; display: flex; justify-content: center; align-items: center; box-shadow: -3px 0 10px rgba(0,0,0,0.5); transition: 0.2s; cursor: pointer; overflow: hidden; margin-left: -40px; } /* زدنا التداخل لـ -40 */
+.card { 
+    width: 65px; height: 95px; border-radius: 8px; border: 3px solid #e0e0e0; 
+    position: relative; display: flex; justify-content: center; align-items: center; 
+    box-shadow: -2px 0 10px rgba(0,0,0,0.5); transition: 0.2s; cursor: pointer; 
+    flex-shrink: 1; margin-left: -35px; /* تداخل أكبر للسماح بظهور كل البطاقات */
+}
         .discard-pile .card { margin: 0; width: 100%; height: 100%; border-width: 3px; }
         .inner-oval { width: 115%; height: 75%; background-color: white; border-radius: 50%; transform: rotate(-45deg); position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1; }
         .symbol { font-weight: bold; transform: rotate(45deg); z-index: 2; font-size: 35px; }
@@ -94,8 +102,8 @@
         .green { background-color: var(--uno-green); } .green .symbol { color: var(--uno-green); }
         .wild { background-color: #111; } .wild .inner-oval { background: linear-gradient(45deg, var(--uno-red) 25%, var(--uno-blue) 25%, var(--uno-blue) 50%, var(--uno-yellow) 50%, var(--uno-yellow) 75%, var(--uno-green) 75%); } .wild .symbol { color: white; font-size: 18px; }
 
-.my-hand .card:hover { transform: translateY(-30px) scale(1.1); z-index: 500 !important; margin-right: 30px; }
-
+        .my-hand .card:hover { transform: translateY(-20px); z-index: 100 !important; }
+        
         .uno-btn { position: absolute; right: 15px; top: -30px; width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000); border-radius: 50%; border: 3px solid #fff; color: white; font-weight: 900; font-size: 0.7rem; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; }
         
         /* تدرجات Slots */
@@ -120,12 +128,12 @@
         </div>
     </div>
 
-    <div id="stackingAlert" class="stacking-alert">
-        <span>تراكمات السحب الموجهه إليك: +<span id="stackingAmount">0</span></span>
-        <button class="accept-stack-btn" onclick="acceptDrawStack()">اسحب وتخطي الدور</button>
-    </div>
-    
     <div class="bottom-controls">
+        <div id="stackingAlert" class="stacking-alert">
+            <span>تراكمات السحب الموجهه إليك: +<span id="stackingAmount">0</span></span>
+            <button class="accept-stack-btn" onclick="acceptDrawStack()">اسحب وتخطي الدور</button>
+        </div>
+
         <div id="colorPicker">
             <div class="color-btn red" onclick="selectColor('red')"></div>
             <div class="color-btn blue" onclick="selectColor('blue')"></div>
@@ -242,7 +250,7 @@ function renderGame() {
     handContainer.innerHTML = '';
     myHand.forEach((cardStr, index) => {
         const action = (currentTurnId === playerId) ? () => handlePlayCard(cardStr, index) : null;
-        handContainer.appendChild(createCardElement(cardStr, (index + 10), action)); // زدنا قيمة البدء لـ 10 لضمان الظهور فوق الأرضية
+        handContainer.appendChild(createCardElement(cardStr, index + 1, action));
     });
 
     // إظهار التراكم إذا كان مفعلاً
