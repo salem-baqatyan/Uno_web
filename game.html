@@ -59,14 +59,15 @@
         /* --- 4. Your Hand & Controls --- */
         .bottom-controls { height: 160px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); display: flex; flex-direction: column; align-items: center; padding: 10px; border-top: 1px solid #333; position: relative; }
 .my-hand { 
-    width: 100%; display: flex; justify-content: center; align-items: flex-end; 
-    height: 100%; padding: 0 20px; overflow: visible; /* سمحنا بالظهور خارج الحدود للهوفر */
+    width: 100%; display: grid; height: 100%; padding: 0 10px;
+    grid-auto-flow: column; justify-content: center; align-items: flex-end;
+    grid-auto-columns: minmax(10px, auto); /* هنا السحر: العمود يتقلص لـ 10px كحد أدنى عند الزحام */
 }
         .my-hand::-webkit-scrollbar { display: none; }
 
         /* Stacking UI (تنبيه التراكم) */
         .stacking-alert {
-position: absolute; top: 0; left: 50%; transform: translate(-50%, -100%);
+            position: absolute; top: 0; left: 50%; transform: translate(-50%, -100%);
             background: rgba(20, 0, 0, 0.95); border: 2px solid var(--uno-red);
             padding: 8px 15px; border-radius: 20px; display: none; /* مخفي افتراضياً */
             align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(255,0,0,0.4); z-index: 150;
@@ -85,10 +86,10 @@ position: absolute; top: 0; left: 50%; transform: translate(-50%, -100%);
 
         /* --- 5. البطاقات --- */
 .card { 
-    width: 65px; height: 95px; border-radius: 8px; border: 3px solid #e0e0e0; 
-    position: relative; display: flex; justify-content: center; align-items: center; 
-    box-shadow: -2px 0 10px rgba(0,0,0,0.5); transition: 0.2s; cursor: pointer; 
-    flex-shrink: 1; margin-left: -35px; /* تداخل أكبر للسماح بظهور كل البطاقات */
+    width: 65px; min-width: 65px; height: 95px; border-radius: 8px; 
+    border: 3px solid #e0e0e0; position: relative; display: flex; 
+    justify-content: center; align-items: center; transition: 0.2s; 
+    cursor: pointer; box-shadow: -3px 0 10px rgba(0,0,0,0.5);
 }
         .discard-pile .card { margin: 0; width: 100%; height: 100%; border-width: 3px; }
         .inner-oval { width: 115%; height: 75%; background-color: white; border-radius: 50%; transform: rotate(-45deg); position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1; }
