@@ -13,15 +13,11 @@
             --uno-blue: #5555ff;
             --uno-green: #55aa55;
             --uno-yellow: #ffaa00;
-            --text-gray: #aaaaaa;
             --mobile-max-width: 450px;
         }
 
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { 
-            margin: 0; background-color: var(--bg-dark); color: white; 
-            display: flex; justify-content: center; align-items: center; height: 100dvh; overflow: hidden; 
-        }
+        body { margin: 0; background-color: var(--bg-dark); color: white; display: flex; justify-content: center; align-items: center; height: 100dvh; overflow: hidden; }
 
         .mobile-wrapper {
             width: 100%; max-width: var(--mobile-max-width); height: 100dvh; 
@@ -30,221 +26,104 @@
         }
 
         /* --- 1. App Bar --- */
-        .top-bar { 
-            display: flex; justify-content: space-between; align-items: center; 
-            padding: 10px 15px; flex-shrink: 0; z-index: 100;
-        }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; flex-shrink: 0; z-index: 100; }
         .top-left, .top-right { display: flex; gap: 8px; align-items: center; }
-        .top-timer { 
-            color: white; font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', Courier, monospace; 
-            position: absolute; left: 50%; transform: translateX(-50%); 
-        }
-        .icon-circle { 
-            width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 50%; 
-            display: flex; align-items: center; justify-content: center; border: 0.5px solid white; cursor: pointer; color: white; 
-        }
-        .btn-pill { 
-            background: rgba(255,255,255,0.1); border: 1px solid #444; padding: 6px 12px; 
-            border-radius: 20px; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: white; 
-        }
+        .top-timer { color: white; font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', monospace; position: absolute; left: 50%; transform: translateX(-50%); }
+        .icon-circle { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 0.5px solid white; cursor: pointer; color: white; }
+        .btn-pill { background: rgba(255,255,255,0.1); border: 1px solid #444; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: white; }
 
         /* --- 2. Arena --- */
-        .game-area {
-            flex: 1; position: relative; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; padding: 20px;
-        }
-
-        .arena-center {
-            width: 180px; height: 180px; background: rgba(255,255,255,0.03);
-            border-radius: 50%; border: 2px dashed rgba(255,255,255,0.1);
-            display: flex; justify-content: center; align-items: center; gap: 15px;
-            position: relative;
-        }
-
-        .play-direction {
-            position: absolute; width: 220px; height: 220px;
-            border: 2px solid transparent; border-top: 2px solid white;
-            border-radius: 50%; animation: rotate-cw 10s linear infinite;
-            pointer-events: none;
-        }
+        .game-area { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        .arena-center { width: 180px; height: 180px; background: rgba(255,255,255,0.03); border-radius: 50%; border: 2px dashed rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
+        
+        .play-direction { position: absolute; width: 220px; height: 220px; border: 2px solid transparent; border-top: 2px solid white; border-radius: 50%; animation: rotate-cw 10s linear infinite; pointer-events: none; }
         .play-direction.ccw { animation: rotate-ccw 10s linear infinite; }
-
         @keyframes rotate-cw { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes rotate-ccw { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
 
-        .deck-pile, .discard-pile {
-            width: 70px; height: 100px; border-radius: 8px; position: relative;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.3s;
-        }
-
-        .deck-pile { 
-            background: linear-gradient(135deg, #222 0%, #000 100%); 
-            border: 2px solid #444; cursor: pointer;
-            display: flex; justify-content: center; align-items: center;
-        }
+        .deck-pile, .discard-pile { width: 70px; height: 100px; border-radius: 8px; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.3s; }
+        .deck-pile { background: linear-gradient(135deg, #222 0%, #000 100%); border: 2px solid #444; cursor: pointer; display: flex; justify-content: center; align-items: center; }
         .deck-pile::before { content: "UNO"; font-weight: 900; color: #333; font-size: 0.8rem; }
-
         .discard-pile { background: white; border: 2px solid #fff; overflow: hidden; }
 
         /* --- 3. Players Layout --- */
         .players-container { position: absolute; inset: 0; pointer-events: none; }
-        .player-seat {
-            position: absolute; width: 80px; display: flex; flex-direction: column;
-            align-items: center; pointer-events: auto; transition: all 0.5s ease;
-        }
-        .avatar-wrap {
-            position: relative; width: 50px; height: 50px; border-radius: 50%;
-            padding: 2px; border: 2px solid #fff; background: #333; z-index: 2;
-        }
+        .player-seat { position: absolute; width: 80px; display: flex; flex-direction: column; align-items: center; pointer-events: auto; transition: all 0.5s ease; }
+        .avatar-wrap { position: relative; width: 50px; height: 50px; border-radius: 50%; padding: 2px; border: 2px solid #fff; background: #333; z-index: 2; }
         .avatar-wrap img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-        .player-name {
-            background: rgba(0,0,0,0.9); padding: 2px 10px; border-radius: 5px;
-            font-size: 0.65rem; margin-top: -5px; z-index: 3; white-space: nowrap;
-            border: 1px solid #ffffff; color: white;
-        }
-        .card-count-badge {
-            position: absolute; top: -5px; right: -5px;
-            background: #ffaa00; color: black; font-weight: bold;
-            font-size: 0.7rem; width: 20px; height: 20px;
-            border-radius: 50%; display: flex; justify-content: center; align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-        }
+        .player-name { background: rgba(0,0,0,0.9); padding: 2px 10px; border-radius: 5px; font-size: 0.65rem; margin-top: -5px; z-index: 3; white-space: nowrap; border: 1px solid #ffffff; color: white; }
+        .card-count-badge { position: absolute; top: -5px; right: -5px; background: #ffaa00; color: black; font-weight: bold; font-size: 0.7rem; width: 20px; height: 20px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .player-seat.is-turn { filter: drop-shadow(0 0 10px #7ed321) drop-shadow(0 0 5px #7ed321); z-index: 100; }
         .player-seat.is-me .player-name { color: #7ed321; font-weight: bold; }
 
-        /* --- 4. Your Hand & Color Picker --- */
-        .bottom-controls {
-            height: 160px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);
-            display: flex; flex-direction: column; align-items: center; 
-            padding: 10px; border-top: 1px solid #333; position: relative;
-        }
-
-        .my-hand {
-            width: 100%; display: flex; justify-content: center; align-items: flex-end;
-            height: 90%; gap: -20px; overflow-x: auto; padding: 10px; scrollbar-width: none;
-        }
+        /* --- 4. Your Hand & Controls --- */
+        .bottom-controls { height: 160px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); display: flex; flex-direction: column; align-items: center; padding: 10px; border-top: 1px solid #333; position: relative; }
+        .my-hand { width: 100%; display: flex; justify-content: center; align-items: flex-end; height: 90%; gap: -20px; overflow-x: auto; padding: 10px; scrollbar-width: none; }
         .my-hand::-webkit-scrollbar { display: none; }
 
-        /* تصميم اختيار الألوان المطور */
-        #colorPicker {
-            position: absolute; top: -70px; background: rgba(0,0,0,0.9);
-            padding: 10px 20px; border-radius: 15px; border: 1px solid #444;
-            display: none; gap: 10px; z-index: 1000; box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+        /* Stacking UI (تنبيه التراكم) */
+        .stacking-alert {
+            position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+            background: rgba(20, 0, 0, 0.95); border: 2px solid var(--uno-red);
+            padding: 8px 15px; border-radius: 20px; display: none; /* مخفي افتراضياً */
+            align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(255,0,0,0.4); z-index: 150;
         }
-        .color-btn {
-            width: 45px; height: 45px; border-radius: 10px; border: 2px solid white;
-            cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center;
+        .stacking-alert span { color: white; font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
+        .accept-stack-btn {
+            background-color: var(--uno-red); color: white; border: 1px solid #fff;
+            padding: 6px 12px; border-radius: 10px; font-weight: bold; font-size: 0.75rem;
+            cursor: pointer; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
         }
+        .accept-stack-btn:active { transform: scale(0.95); }
+
+        #colorPicker { position: absolute; top: -70px; background: rgba(0,0,0,0.9); padding: 10px 20px; border-radius: 15px; border: 1px solid #444; display: none; gap: 10px; z-index: 1000; box-shadow: 0 5px 20px rgba(0,0,0,0.8); }
+        .color-btn { width: 45px; height: 45px; border-radius: 10px; border: 2px solid white; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
         .color-btn:active { transform: scale(0.9); }
 
         /* --- 5. البطاقات --- */
-        .card {
-            min-width: 65px; width: 65px; height: 95px; border-radius: 8px; 
-            border: 3px solid #e0e0e0; position: relative;
-            display: flex; justify-content: center; align-items: center;
-            box-shadow: -3px 0 10px rgba(0,0,0,0.5); transition: 0.2s;
-            cursor: pointer; overflow: hidden; margin-left: -25px;
-        }
-        
-        /* البطاقة داخل الكومة (المركز) لا تتقلص */
+        .card { min-width: 65px; width: 65px; height: 95px; border-radius: 8px; border: 3px solid #e0e0e0; position: relative; display: flex; justify-content: center; align-items: center; box-shadow: -3px 0 10px rgba(0,0,0,0.5); transition: 0.2s; cursor: pointer; overflow: hidden; margin-left: -25px; }
         .discard-pile .card { margin: 0; width: 100%; height: 100%; border-width: 3px; }
-
-        .inner-oval {
-            width: 115%; height: 75%; background-color: white;
-            border-radius: 50%; transform: rotate(-45deg);
-            position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1;
-        }
+        .inner-oval { width: 115%; height: 75%; background-color: white; border-radius: 50%; transform: rotate(-45deg); position: absolute; display: flex; justify-content: center; align-items: center; z-index: 1; }
         .symbol { font-weight: bold; transform: rotate(45deg); z-index: 2; font-size: 35px; }
         .corner-number { position: absolute; font-size: 10px; font-weight: bold; color: white; z-index: 2; }
-        .top-left { top: 2px; left: 2px; }
-        .bottom-right { bottom: 2px; right: 2px;}
+        .top-left { top: 2px; left: 2px; } .bottom-right { bottom: 2px; right: 2px;}
 
         .red { background-color: var(--uno-red); } .red .symbol { color: var(--uno-red); }
         .blue { background-color: var(--uno-blue); } .blue .symbol { color: var(--uno-blue); }
         .yellow { background-color: var(--uno-yellow); } .yellow .symbol { color: var(--uno-yellow); }
         .green { background-color: var(--uno-green); } .green .symbol { color: var(--uno-green); }
-        .wild { background-color: #111; }
-        .wild .inner-oval { background: linear-gradient(45deg, var(--uno-red) 25%, var(--uno-blue) 25%, var(--uno-blue) 50%, var(--uno-yellow) 50%, var(--uno-yellow) 75%, var(--uno-green) 75%); }
-        .wild .symbol { color: white; font-size: 18px; }
+        .wild { background-color: #111; } .wild .inner-oval { background: linear-gradient(45deg, var(--uno-red) 25%, var(--uno-blue) 25%, var(--uno-blue) 50%, var(--uno-yellow) 50%, var(--uno-yellow) 75%, var(--uno-green) 75%); } .wild .symbol { color: white; font-size: 18px; }
 
         .my-hand .card:hover { transform: translateY(-20px); z-index: 100 !important; }
         
-        .uno-btn {
-            position: absolute; right: 15px; top: -30px;
-            width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000);
-            border-radius: 50%; border: 3px solid #fff; color: white;
-            font-weight: 900; font-size: 0.7rem; display: flex;
-            justify-content: center; align-items: center; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s;
-        }
-
-        /* تدرجات الـ Slots */
-        .slot-0 .avatar-wrap { background: linear-gradient(135deg, #7b241c, #e74c3c); }
-        .slot-1 .avatar-wrap { background: linear-gradient(135deg, #154360, #3498db); }
-        .slot-2 .avatar-wrap { background: linear-gradient(135deg, #145a32, #2ecc71); }
-        .slot-3 .avatar-wrap { background: linear-gradient(135deg, #7e5109, #f1c40f); }
-        .slot-4 .avatar-wrap { background: linear-gradient(135deg, #6e2c00, #e67e22); }
-        .slot-5 .avatar-wrap { background: linear-gradient(135deg, #4a235a, #9b59b6); }
-        .slot-6 .avatar-wrap { background: linear-gradient(135deg, #641e16, #ec407a); }
-        .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); }
-        .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); }
-        .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
-    
-/* واجهة التراكم الموجهة للاعب */
-#stack-warning {
-    position: absolute;
-    top: -90px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 0, 0, 0.9);
-    padding: 10px 15px;
-    border-radius: 12px;
-    display: none; /* يظهر فقط عند الحاجة */
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    border: 2px solid white;
-    z-index: 200;
-    min-width: 200px;
-}
-.stack-text { font-weight: bold; font-size: 0.8rem; color: white; }
-.draw-skip-btn {
-    background: white; color: red; border: none;
-    padding: 5px 15px; border-radius: 5px; font-weight: bold;
-    cursor: pointer; font-size: 0.8rem;
-}
+        .uno-btn { position: absolute; right: 15px; top: -30px; width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000); border-radius: 50%; border: 3px solid #fff; color: white; font-weight: 900; font-size: 0.7rem; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; }
+        
+        /* تدرجات Slots */
+        .slot-0 .avatar-wrap { background: linear-gradient(135deg, #7b241c, #e74c3c); } .slot-1 .avatar-wrap { background: linear-gradient(135deg, #154360, #3498db); } .slot-2 .avatar-wrap { background: linear-gradient(135deg, #145a32, #2ecc71); } .slot-3 .avatar-wrap { background: linear-gradient(135deg, #7e5109, #f1c40f); } .slot-4 .avatar-wrap { background: linear-gradient(135deg, #6e2c00, #e67e22); } .slot-5 .avatar-wrap { background: linear-gradient(135deg, #4a235a, #9b59b6); } .slot-6 .avatar-wrap { background: linear-gradient(135deg, #641e16, #ec407a); } .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); } .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); } .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
     </style>
 </head>
 <body>
 
 <div class="mobile-wrapper">
     <div class="top-bar">
-        <div class="top-left">
-            <div class="icon-circle">
-                <span id="playerCount">0</span> 👤
-            </div> 
-            <div class="btn-pill" id="roomDisplay">🔗 الغرفة</div>
-        </div>
+        <div class="top-left"><div class="icon-circle"><span id="playerCount">0</span> 👤</div><div class="btn-pill" id="roomDisplay">🔗 الغرفة</div></div>
         <div class="top-timer" id="gameTimer"></div>
-        <div class="top-right">
-            <div class="btn-pill">📜القواعد</div>
-            <div class="icon-circle">⚙️</div>
-        </div>
+        <div class="top-right"><div class="btn-pill">📜القواعد</div><div class="icon-circle">⚙️</div></div>
     </div>
 
     <div class="game-area">
         <div class="players-container" id="playersContainer"></div>
-
         <div class="arena-center">
             <div class="play-direction" id="directionIndicator"></div>
             <div class="deck-pile" id="deckPile"></div>
             <div class="discard-pile" id="currentCard"></div>
         </div>
     </div>
+
     <div class="bottom-controls">
-        <div id="stack-warning">
-            <span class="stack-text">تراكمات السحب الموجهة إليك: <span id="stack-count">+0</span></span>
-            <button class="draw-skip-btn" id="drawSkipBtn">اسحب وتخطى الدور</button>
+        <div id="stackingAlert" class="stacking-alert">
+            <span>تراكمات السحب الموجهه إليك: +<span id="stackingAmount">0</span></span>
+            <button class="accept-stack-btn" onclick="acceptDrawStack()">اسحب وتخطي الدور</button>
         </div>
 
         <div id="colorPicker">
@@ -261,8 +140,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, update, onValue, serverTimestamp } 
-from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+import { getDatabase, ref, update, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
@@ -288,13 +166,9 @@ let gameState = null;
 let playersData = null;
 let activePlayersList = [];
 let myHand = [];
-let pendingWildCard = null; // لتخزين البطاقة التي تنتظر اختيار اللون
+let pendingWildCard = null; 
 
-const valueMap = {
-    "Zero": "0", "One": "1", "Two": "2", "Three": "3", "Four": "4", 
-    "Five": "5", "Six": "6", "Seven": "7", "Eight": "8", "Nine": "9",
-    "Skip": "⊘", "Reverse": "↻", "DrawTwo": "+2"
-};
+const valueMap = { "Zero":"0", "One":"1", "Two":"2", "Three":"3", "Four":"4", "Five":"5", "Six":"6", "Seven":"7", "Eight":"8", "Nine":"9", "Skip":"⊘", "Reverse":"↻", "DrawTwo":"+2" };
 
 function parseCard(cardStr) {
     if (cardStr === "wildColor") return { color: "wild", value: "C", symbol: "Color", isWild: true };
@@ -303,10 +177,7 @@ function parseCard(cardStr) {
 
     const colors = ["red", "blue", "green", "yellow"];
     for (let c of colors) {
-        if (cardStr.startsWith(c)) {
-            const valStr = cardStr.replace(c, "");
-            return { color: c, value: valueMap[valStr], symbol: valueMap[valStr], isWild: false };
-        }
+        if (cardStr.startsWith(c)) return { color: c, value: valueMap[cardStr.replace(c, "")], symbol: valueMap[cardStr.replace(c, "")], isWild: false };
     }
     return { color: "unknown", value: "?", symbol: "?" };
 }
@@ -316,56 +187,51 @@ function createCardElement(cardStr, zIndex, onClickAction) {
     const div = document.createElement('div');
     div.className = `card ${card.color}`;
     div.style.zIndex = zIndex;
-    
-    div.innerHTML = `
-        <div class="corner-number top-left">${card.value}</div>
-        <div class="inner-oval"><span class="symbol">${card.symbol}</span></div>
-        <div class="corner-number bottom-right">${card.value}</div>
-    `;
-
+    div.innerHTML = `<div class="corner-number top-left">${card.value}</div><div class="inner-oval"><span class="symbol">${card.symbol}</span></div><div class="corner-number bottom-right">${card.value}</div>`;
     if (onClickAction) div.onclick = onClickAction;
     return div;
 }
 
-async function recycleDiscardPile() {
-    let discard = [...gameState.discardPile];
-    const topCard = discard.pop(); // الاحتفاظ بالبطاقة الأخيرة
-    
-    // خلط البطاقات المتبقية (Fisher-Yates shuffle)
-    for (let i = discard.length - 1; i > 0; i--) {
+// دالة خلط المصفوفة
+function shuffleArray(array) {
+    let newArr = [...array];
+    for (let i = newArr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [discard[i], discard[j]] = [discard[j], discard[i]];
+        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
     }
-    
-    const updates = {};
-    updates[`rooms/${roomId}/game/deck`] = discard;
-    updates[`rooms/${roomId}/game/discardPile`] = [topCard];
-    await update(ref(db), updates);
+    return newArr;
+}
+
+// دالة سحب البطاقات مع معالجة إعادة الخلط
+function extractCardsToDraw(count, currentDeck, currentDiscard) {
+    let drawnCards = [];
+    let deck = [...(currentDeck || [])];
+    let discard = [...(currentDiscard || [])];
+
+    for (let i = 0; i < count; i++) {
+        if (deck.length === 0) {
+            if (discard.length <= 1) break; // لا يوجد بطاقات كافية للخلط
+            const topCard = discard.pop();
+            deck = shuffleArray(discard);
+            discard = [topCard];
+        }
+        drawnCards.push(deck.pop());
+    }
+    return { drawnCards, deck, discard };
 }
 
 function renderGame() {
     if (!gameState || !playersData) return;
 
     const currentTurnId = gameState.turnState.currentTurnId;
-    const isMyTurn = (currentTurnId === playerId);
-    const stackCount = gameState.turnState.drawStack || 0;
-
-    // إظهار/إخفاء واجهة التراكم
-    const stackUI = document.getElementById('stack-warning');
-    if (stackCount > 0 && isMyTurn) {
-        stackUI.style.display = 'flex';
-        document.getElementById('stack-count').innerText = `+${stackCount}`;
-    } else {
-        stackUI.style.display = 'none';
-    }
-
-    // تحديث الأرينا واللاعبين (كما في الكود السابق)
     window.layoutPlayers(playersData, playerId, currentTurnId);
-    
+
     const directionEl = document.getElementById('directionIndicator');
     const topCardStr = gameState.discardPile[gameState.discardPile.length - 1];
     const topCard = parseCard(topCardStr);
     const activeColor = gameState.turnState.selectedColor || topCard.color;
+    
+    directionEl.className = `play-direction ${gameState.turnState.direction === -1 ? 'ccw' : ''}`;
     directionEl.style.borderTopColor = `var(--uno-${activeColor})`;
 
     const discardContainer = document.getElementById('currentCard');
@@ -375,40 +241,23 @@ function renderGame() {
     const handContainer = document.getElementById('myHand');
     handContainer.innerHTML = '';
     myHand.forEach((cardStr, index) => {
-        const action = isMyTurn ? () => handlePlayCard(cardStr, index) : null;
+        const action = (currentTurnId === playerId) ? () => handlePlayCard(cardStr, index) : null;
         handContainer.appendChild(createCardElement(cardStr, index + 1, action));
     });
+
+    // إظهار التراكم إذا كان مفعلاً
+    const stackingAlert = document.getElementById('stackingAlert');
+    const drawStack = gameState.turnState.drawStack || 0;
+    const isStackingEnabled = gameState.settings ? gameState.settings.stacking : true;
+
+    if (currentTurnId === playerId && drawStack > 0 && isStackingEnabled) {
+        stackingAlert.style.display = 'flex';
+        document.getElementById('stackingAmount').innerText = drawStack;
+    } else {
+        stackingAlert.style.display = 'none';
+    }
 }
 
-// زر "اسحب وتخطى الدور"
-document.getElementById('drawSkipBtn').onclick = async () => {
-    const stackCount = gameState.turnState.drawStack || 0;
-    let deck = [...gameState.deck];
-    
-    // إذا كانت الكومة لا تكفي، أعد التدوير أولاً
-    if (deck.length < stackCount) {
-        await recycleDiscardPile();
-        // إعادة جلب الحالة بعد التحديث
-        return; 
-    }
-
-    let newHand = [...myHand];
-    for (let i = 0; i < stackCount; i++) {
-        if (deck.length > 0) newHand.push(deck.pop());
-    }
-
-    const updates = {};
-    updates[`rooms/${roomId}/game/deck`] = deck;
-    updates[`rooms/${roomId}/players/${playerId}/hand`] = newHand;
-    updates[`rooms/${roomId}/players/${playerId}/handCount`] = newHand.length;
-    // تصفير التراكم ونقل الدور
-    updates[`rooms/${roomId}/game/turnState/drawStack`] = 0;
-    updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(true); // تخطي الدور
-    
-    await update(ref(db), updates);
-};
-
-// دالة اختيار اللون من الديالوق
 window.selectColor = function(color) {
     if (!pendingWildCard) return;
     const { cardStr, cardIndex } = pendingWildCard;
@@ -417,24 +266,33 @@ window.selectColor = function(color) {
     pendingWildCard = null;
 };
 
-async function handlePlayCard(cardStr, cardIndex) {
-    const card = parseCard(cardStr);
-    const stackCount = gameState.turnState.drawStack || 0;
+function getNextPlayerId(skip, currentDirection) {
+    const idx = activePlayersList.findIndex(p => p.id === gameState.turnState.currentTurnId);
+    let step = currentDirection * (skip ? 2 : 1);
+    let nextIdx = (idx + step) % activePlayersList.length;
+    if (nextIdx < 0) nextIdx += activePlayersList.length;
+    return activePlayersList[nextIdx].id;
+}
 
-    // إذا كان هناك تراكم، لا يمكنك لعب أي ورقة إلا إذا كانت من نفس نوع السحب (تراكم)
-    if (stackCount > 0) {
-        const topCardStr = gameState.discardPile[gameState.discardPile.length - 1];
-        const topCard = parseCard(topCardStr);
-        
-        // لا يسمح إلا برمي +2 على +2، أو +4 على +4 (حسب القواعد الشائعة)
-        if (card.value !== topCard.value) {
-            alert("يجب عليك الرد بنفس بطاقة السحب أو الضغط على زر اسحب وتخطى!");
-            return;
-        }
+function isValidMove(playedStr) {
+    const topStr = gameState.discardPile[gameState.discardPile.length - 1];
+    const top = parseCard(topStr);
+    const played = parseCard(playedStr);
+    const activeCol = gameState.turnState.selectedColor || top.color;
+    const drawStack = gameState.turnState.drawStack || 0;
+
+    // إذا كان هناك تراكم، يجب اللعب بـ +2 أو +4 فقط
+    if (drawStack > 0) {
+        return (played.value === "+2" || played.value === "+4");
     }
 
-    if (!isValidMove(cardStr)) return alert("حركة غير قانونية!");
+    return played.isWild || played.color === activeCol || played.value === top.value;
+}
 
+async function handlePlayCard(cardStr, cardIndex) {
+    if (!isValidMove(cardStr)) return alert("لا يمكنك لعب هذه البطاقة!");
+
+    const card = parseCard(cardStr);
     if (card.isWild) {
         pendingWildCard = { cardStr, cardIndex };
         document.getElementById('colorPicker').style.display = 'flex';
@@ -444,68 +302,103 @@ async function handlePlayCard(cardStr, cardIndex) {
 }
 
 async function executeMove(cardStr, cardIndex, chosenColor) {
-    const card = parseCard(cardStr);
-    let currentStack = gameState.turnState.drawStack || 0;
-    let skipNext = false;
     let nextDirection = gameState.turnState.direction;
+    let skipNext = false;
+    let addedStack = 0;
+    const card = parseCard(cardStr);
+    const isStackingEnabled = gameState.settings ? gameState.settings.stacking : true;
 
-    // منطق السحب والتراكم
-    if (card.value === "+2") currentStack += 2;
-    else if (card.value === "+4") currentStack += 4;
-    else if (card.value === "⊘") skipNext = true;
-    else if (card.value === "↻") {
+    if (card.value === "↻") {
         nextDirection *= -1;
         if (activePlayersList.length === 2) skipNext = true;
-    }
+    } else if (card.value === "⊘") {
+        skipNext = true;
+    } else if (card.value === "+2") addedStack = 2;
+    else if (card.value === "+4") addedStack = 4;
+
+    let newDrawStack = (gameState.turnState.drawStack || 0) + addedStack;
+    let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
+    
+    let deck = [...(gameState.deck || [])];
+    let discardPile = [...(gameState.discardPile || [])];
+    
+    myHand.splice(cardIndex, 1);
+    discardPile.push(cardStr);
 
     const updates = {};
-    myHand.splice(cardIndex, 1);
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
 
-    const newDiscardPile = [...gameState.discardPile, cardStr];
-    updates[`rooms/${roomId}/game/discardPile`] = newDiscardPile;
-    
-    // إذا لم تكن ورقة سحب، وكان هناك تراكم قديم (لا يحصل في المنطق الطبيعي لكن للأمان)
-    // الدور ينتقل للاعب التالي
+    // معالجة السحب المباشر إذا كان التراكم مغلقاً
+    if (addedStack > 0 && !isStackingEnabled) {
+        nextPlayerId = getNextPlayerId(true, nextDirection); // تخطي اللاعب المنسحب عليه
+        const targetPlayerId = getNextPlayerId(false, nextDirection); // اللاعب المستهدف للسحب
+
+        const drawRes = extractCardsToDraw(newDrawStack, deck, discardPile);
+        deck = drawRes.deck;
+        discardPile = drawRes.discard;
+        
+        let targetHand = (playersData[targetPlayerId].hand || []).concat(drawRes.drawnCards);
+        updates[`rooms/${roomId}/players/${targetPlayerId}/hand`] = targetHand;
+        updates[`rooms/${roomId}/players/${targetPlayerId}/handCount`] = targetHand.length;
+        
+        newDrawStack = 0; // تصفير التراكم لأنه نُفذ فوراً
+    }
+
+    updates[`rooms/${roomId}/game/deck`] = deck;
+    updates[`rooms/${roomId}/game/discardPile`] = discardPile;
     updates[`rooms/${roomId}/game/turnState`] = {
-        currentTurnId: getNextPlayerId(skipNext),
-        direction: nextDirection,
-        selectedColor: chosenColor,
-        drawStack: currentStack,
-        lastUpdated: serverTimestamp()
+        currentTurnId: nextPlayerId, direction: nextDirection, selectedColor: chosenColor,
+        drawStack: newDrawStack, lastUpdated: serverTimestamp()
     };
 
     await update(ref(db), updates);
 }
 
+// دالة قبول التراكم والسحب (مربوطة بالزر الأحمر)
+window.acceptDrawStack = async function() {
+    if (gameState.turnState.currentTurnId !== playerId) return;
+    const drawCount = gameState.turnState.drawStack;
+    if (!drawCount || drawCount <= 0) return;
 
-function isValidMove(playedStr) {
-    const topStr = gameState.discardPile[gameState.discardPile.length - 1];
-    const top = parseCard(topStr);
-    const played = parseCard(playedStr);
-    const activeCol = gameState.turnState.selectedColor || top.color;
-    return played.isWild || played.color === activeCol || played.value === top.value;
-}
+    let deck = [...(gameState.deck || [])];
+    let discardPile = [...(gameState.discardPile || [])];
 
-function getNextPlayerId(skip) {
-    const idx = activePlayersList.findIndex(p => p.id === gameState.turnState.currentTurnId);
-    let step = gameState.turnState.direction * (skip ? 2 : 1);
-    let nextIdx = (idx + step) % activePlayersList.length;
-    if (nextIdx < 0) nextIdx += activePlayersList.length;
-    return activePlayersList[nextIdx].id;
-}
+    const drawRes = extractCardsToDraw(drawCount, deck, discardPile);
+    myHand = myHand.concat(drawRes.drawnCards);
 
-document.getElementById('deckPile').onclick = async () => {
-    if (gameState.turnState.currentTurnId !== playerId) return alert("ليس دورك!");
-    let deck = [...gameState.deck];
-    if (deck.length === 0) return alert("الكومة فارغة!");
-    myHand.push(deck.pop());
     const updates = {};
-    updates[`rooms/${roomId}/game/deck`] = deck;
+    updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
+    updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
-    updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false);
+    updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
+    updates[`rooms/${roomId}/game/turnState/drawStack`] = 0;
+    updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
+
+    await update(ref(db), updates);
+};
+
+// السحب العادي مع الخلط التلقائي
+document.getElementById('deckPile').onclick = async () => {
+    if (gameState.turnState.currentTurnId !== playerId) return alert("ليس دورك!");
+    if (gameState.turnState.drawStack > 0) return alert("اضغط على (اسحب وتخطي الدور) لإنهاء التراكمات!");
+
+    let deck = [...(gameState.deck || [])];
+    let discardPile = [...(gameState.discardPile || [])];
+
+    const drawRes = extractCardsToDraw(1, deck, discardPile);
+    if (drawRes.drawnCards.length === 0) return alert("لا توجد بطاقات كافية!");
+    
+    myHand.push(drawRes.drawnCards[0]);
+
+    const updates = {};
+    updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
+    updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
+    updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
+    updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+    updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
+    
     await update(ref(db), updates);
 };
 
