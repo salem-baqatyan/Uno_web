@@ -95,9 +95,9 @@
         .wild { background-color: #111; } .wild .inner-oval { background: linear-gradient(45deg, var(--uno-red) 25%, var(--uno-blue) 25%, var(--uno-blue) 50%, var(--uno-yellow) 50%, var(--uno-yellow) 75%, var(--uno-green) 75%); } .wild .symbol { color: white; font-size: 18px; }
 
         /* ابحث عن قسم الألوان وأضف هذا التنسيق */
-.eraser { background-color: #ffffff; border-color: #dcdcdc; }
-.eraser .inner-oval { background-color: #f0f0f0; } /* تباين بسيط للداخل */
-.eraser .symbol, .eraser .corner-number { display: none; } /* إخفاء أي رموز */
+        .eraser { background-color: #ffffff; border-color: #dcdcdc; }
+        .eraser .inner-oval { background-color: #ffffff; } /* تباين بسيط للداخل */
+        .eraser .symbol, .eraser .corner-number { display: none; } /* إخفاء أي رموز */
 
         .my-hand .card:hover { transform: translateY(-20px); z-index: 100 !important; }
         
@@ -106,6 +106,35 @@
         /* تدرجات Slots */
         .slot-0 .avatar-wrap { background: linear-gradient(135deg, #7b241c, #e74c3c); } .slot-1 .avatar-wrap { background: linear-gradient(135deg, #154360, #3498db); } .slot-2 .avatar-wrap { background: linear-gradient(135deg, #145a32, #2ecc71); } .slot-3 .avatar-wrap { background: linear-gradient(135deg, #7e5109, #f1c40f); } .slot-4 .avatar-wrap { background: linear-gradient(135deg, #6e2c00, #e67e22); } .slot-5 .avatar-wrap { background: linear-gradient(135deg, #4a235a, #9b59b6); } .slot-6 .avatar-wrap { background: linear-gradient(135deg, #641e16, #ec407a); } .slot-7 .avatar-wrap { background: linear-gradient(135deg, #0b5345, #00ced1); } .slot-8 .avatar-wrap { background: linear-gradient(135deg, #1d8348, #adff2f); } .slot-9 .avatar-wrap { background: linear-gradient(135deg, #1b2631, #2471a3); }
 
+        /* --- إشعارات Toast --- */
+#toastContainer {
+    position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+    z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+}
+.toast-msg {
+    background: rgba(0, 0, 0, 0.85); border: 2px solid var(--uno-yellow);
+    color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold;
+    font-size: 0.8rem; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+    animation: fade-in-out 4s forwards; text-align: center; white-space: nowrap;
+}
+@keyframes fade-in-out {
+    0% { opacity: 0; transform: translateY(-20px); }
+    10% { opacity: 1; transform: translateY(0); }
+    80% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+}
+
+/* --- النبض الأحمر لمن لديه بطاقة واحدة --- */
+@keyframes pulse-red {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.8); }
+    70% { transform: scale(1.3); box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+}
+.uno-danger {
+    background-color: red !important; color: white !important;
+    animation: pulse-red 1s infinite; border: 1px solid white;
+}
+.player-seat .avatar-wrap { cursor: pointer; /* جعل الأفاتار قابل للضغط */ }
     </style>
 </head>
 <body>
@@ -143,6 +172,7 @@
         <div class="my-hand" id="myHand"></div>
 
     </div>
+    <div id="toastContainer"></div>
 </div>
 
 <script type="module">
@@ -382,6 +412,9 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
         updates[`rooms/${roomId}/players/${targetPlayerId}/hand`] = targetHand;
         updates[`rooms/${roomId}/players/${targetPlayerId}/handCount`] = targetHand.length;
         
+        // --- السطر الجديد هنا ---
+        updates[`rooms/${roomId}/players/${targetPlayerId}/saidUno`] = false; 
+        
         newDrawStack = 0; // تصفير التراكم لأنه نُفذ فوراً
     }
 
@@ -412,6 +445,10 @@ window.acceptDrawStack = async function() {
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+    
+    // --- السطر الجديد هنا ---
+    updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false;
+    
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
     updates[`rooms/${roomId}/game/turnState/drawStack`] = 0;
     updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
@@ -432,11 +469,15 @@ document.getElementById('deckPile').onclick = async () => {
     
     myHand.push(drawRes.drawnCards[0]);
 
-    const updates = {};
+const updates = {};
     updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+    
+    // --- السطر الجديد هنا ---
+    updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false;
+    
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
     
     await update(ref(db), updates);
@@ -453,7 +494,41 @@ onValue(gameRef, (snap) => {
     gameState = snap.val();
     renderGame();
 });
+// دالة إظهار الإشعارات على الشاشة
+window.showToast = function(msg) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast-msg';
+    toast.innerText = msg;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000); // يختفي بعد 4 ثوانٍ
+};
 
+// الاستماع للإشعارات القادمة من السيرفر (للجميع)
+let lastToastTime = 0;
+onValue(ref(db, `rooms/${roomId}/game/toastMessage`), (snap) => {
+    const data = snap.val();
+    if (data && data.time > lastToastTime) {
+        lastToastTime = data.time;
+        showToast(data.msg);
+    }
+});
+
+// برمجة زر UNO
+document.querySelector('.uno-btn').onclick = async () => {
+    if (myHand.length === 2) {
+        // إذا كان لديه بطاقتين، يوثق أنه قالها
+        await update(ref(db, `rooms/${roomId}/players/${playerId}`), { saidUno: true });
+        // إرسال إشعار للجميع
+        await update(ref(db, `rooms/${roomId}/game/toastMessage`), { 
+            msg: `🗣️ ${playersData[playerId].name} قال UNO!`, 
+            time: Date.now() 
+        });
+    } else {
+        // إذا كان لديه أكثر من بطاقتين أو بطاقة واحدة (تنبيه محلي له فقط)
+        showToast("يمكنك الضغط على زر UNO فقط عندما يتبقى لك بطاقتين!");
+    }
+};
 window.layoutPlayers = function(playersData, myId, currentTurnId) {
     const container = document.getElementById('playersContainer');
     container.innerHTML = '';
@@ -469,13 +544,73 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         if (!positions[i]) return;
         const pos = positions[i];
         const seat = document.createElement('div');
+        
+        // التحقق مما إذا كان لديه بطاقة واحدة لتفعيل النبض الأحمر
+        const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
+        
         seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId?'is-turn':''}`;
         seat.style.cssText = pos.s==='right'?`top:${pos.t}%;right:15px;transform:translateY(-50%);`:pos.s==='left'?`top:${pos.t}%;left:15px;transform:translateY(-50%);`:`top:20px;left:${pos.l}%;transform:translateX(-50%);`;
-        seat.innerHTML = `<div class="avatar-wrap"><img src="${p.avatar}"><div class="card-count-badge">${p.handCount||0}</div></div><div class="player-name">${p.name}${p.id===myId?' <span class="me-tag">(أنت)</span>':''}</div>`;
+        
+        // أضفنا حدث onclick لتقديم الاعتراض
+        seat.innerHTML = `
+            <div class="avatar-wrap" onclick="handleChallenge('${p.id}')">
+                <img src="${p.avatar}">
+                <div class="card-count-badge ${isUnoDanger}">${p.handCount||0}</div>
+            </div>
+            <div class="player-name">${p.name}${p.id===myId?' <span class="me-tag">(أنت)</span>':''}</div>
+        `;
         container.appendChild(seat);
     });
     document.getElementById('playerCount').innerText = playersArray.length;
-}
+};
+window.handleChallenge = async function(targetId) {
+    if (targetId === playerId) return; // لا يمكنك الاعتراض على نفسك
+    
+    // التحقق أن الدور دورك
+    if (gameState.turnState.currentTurnId !== playerId) {
+        return showToast("يمكنك تقديم اعتراض فقط عندما يكون الدور لك للعب!");
+    }
+    
+    const targetPlayer = playersData[targetId];
+    if (targetPlayer.handCount !== 1) return; // يعترض فقط على من لديه بطاقة واحدة
+
+    // رسالة التأكيد
+    const isSure = confirm(`هل أنت موافق على تقديم اعتراض للاعب (${targetPlayer.name}) بأنه لم يضغط زر الاونو؟\n\nستعاقب بسحب بطاقة إذا أثبت عكس ذلك.`);
+    if (!isSure) return;
+
+    let deck = [...(gameState.deck || [])];
+    let discardPile = [...(gameState.discardPile || [])];
+    const updates = {};
+    let drawRes;
+
+    if (targetPlayer.saidUno === true) {
+        // ❌ اعتراض خاطئ: المعتَرَض عليه قال أونو، المعتَرِض (أنت) تسحب بطاقة
+        drawRes = extractCardsToDraw(1, deck, discardPile);
+        myHand = myHand.concat(drawRes.drawnCards);
+        updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
+        updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+        updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false; // تصفير حالتك
+        updates[`rooms/${roomId}/game/toastMessage`] = { 
+            msg: `❌ اعتراض خاطئ! ${targetPlayer.name} قال UNO. تم معاقبة ${playersData[playerId].name} ببطاقة!`, 
+            time: Date.now() 
+        };
+    } else {
+        // ✅ اعتراض صحيح: المعتَرَض عليه نسي، هو يسحب بطاقتين
+        drawRes = extractCardsToDraw(2, deck, discardPile);
+        let targetHand = (targetPlayer.hand || []).concat(drawRes.drawnCards);
+        updates[`rooms/${roomId}/players/${targetId}/hand`] = targetHand;
+        updates[`rooms/${roomId}/players/${targetId}/handCount`] = targetHand.length;
+        updates[`rooms/${roomId}/players/${targetId}/saidUno`] = false; // تصفير حالته
+        updates[`rooms/${roomId}/game/toastMessage`] = { 
+            msg: `🚨 صاااده! ${targetPlayer.name} نسي يقول UNO وسحب بطاقتين عقاب!`, 
+            time: Date.now() 
+        };
+    }
+
+    updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
+    updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
+    await update(ref(db), updates);
+};
 </script>
 </body>
 </html>
