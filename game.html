@@ -94,6 +94,11 @@
         .green { background-color: var(--uno-green); } .green .symbol { color: var(--uno-green); }
         .wild { background-color: #111; } .wild .inner-oval { background: linear-gradient(45deg, var(--uno-red) 25%, var(--uno-blue) 25%, var(--uno-blue) 50%, var(--uno-yellow) 50%, var(--uno-yellow) 75%, var(--uno-green) 75%); } .wild .symbol { color: white; font-size: 18px; }
 
+        /* ابحث عن قسم الألوان وأضف هذا التنسيق */
+.eraser { background-color: #ffffff; border-color: #dcdcdc; }
+.eraser .inner-oval { background-color: #f0f0f0; } /* تباين بسيط للداخل */
+.eraser .symbol, .eraser .corner-number { display: none; } /* إخفاء أي رموز */
+
         .my-hand .card:hover { transform: translateY(-20px); z-index: 100 !important; }
         
         .uno-btn { position: absolute; right: 15px; top: -30px; width: 60px; height: 60px; background: radial-gradient(#ff0000, #990000); border-radius: 50%; border: 3px solid #fff; color: white; font-weight: 900; font-size: 0.7rem; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; }
@@ -175,7 +180,7 @@ const valueMap = { "Zero":"0", "One":"1", "Two":"2", "Three":"3", "Four":"4", "F
 function parseCard(cardStr) {
     if (cardStr === "wildColor") return { color: "wild", value: "C", symbol: "Color", isWild: true };
     if (cardStr === "wildDrawFour") return { color: "wild", value: "+4", symbol: "+4", isWild: true };
-    if (cardStr === "Eraser") return { color: "wild", value: "⊘", symbol: "Eraser", isWild: true };
+    if (cardStr === "Eraser") return { color: "eraser", value: "", symbol: "", isWild: true, isEraser: true };
 
     const colors = ["red", "blue", "green", "yellow"];
     for (let c of colors) {
@@ -304,6 +309,12 @@ function isValidMove(playedStr) {
     const activeCol = gameState.turnState.selectedColor || top.color;
     const drawStack = gameState.turnState.drawStack || 0;
 
+    // إذا كانت البطاقة الملعوبة هي الماسح
+    if (played.isEraser) {
+        // لا تُلعب إلا إذا كان هناك سحب (تراكم) موجه للاعب
+        return drawStack > 0;
+    }
+
     // إذا كان هناك تراكم، يجب اللعب بـ +2 أو +4 فقط
     if (drawStack > 0) {
         return (played.value === "+2" || played.value === "+4");
@@ -331,15 +342,21 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     const card = parseCard(cardStr);
     const isStackingEnabled = gameState.settings ? gameState.settings.stacking : true;
 
-    if (card.value === "↻") {
-        nextDirection *= -1;
-        if (activePlayersList.length === 2) skipNext = true;
-    } else if (card.value === "⊘") {
-        skipNext = true;
-    } else if (card.value === "+2") addedStack = 2;
-    else if (card.value === "+4") addedStack = 4;
+    // منطق الماسح: يصفر التراكم تماماً
+    let newDrawStack = (gameState.turnState.drawStack || 0);
+    if (card.isEraser) {
+        newDrawStack = 0; 
+    } else {
+        if (card.value === "↻") {
+            nextDirection *= -1;
+            if (activePlayersList.length === 2) skipNext = true;
+        } else if (card.value === "⊘") {
+            skipNext = true;
+        } else if (card.value === "+2") addedStack = 2;
+        else if (card.value === "+4") addedStack = 4;
+        newDrawStack += addedStack;
+    }
 
-    let newDrawStack = (gameState.turnState.drawStack || 0) + addedStack;
     let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
     
     let deck = [...(gameState.deck || [])];
