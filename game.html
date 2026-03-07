@@ -255,9 +255,11 @@ const playerId = urlParams.get('p');
 
 const gameRef = ref(db, `rooms/${roomId}/game`);
 const playersRef = ref(db, `rooms/${roomId}/players`);
+const settingsRef = ref(db, `rooms/${roomId}/settings`);
 
 let gameState = null;
 let playersData = null;
+let roomSettings = {};
 let activePlayersList = [];
 let myHand = [];
 let pendingWildCard = null; 
@@ -361,7 +363,7 @@ function renderGame() {
     // إظهار التراكم إذا كان مفعلاً
     const stackingAlert = document.getElementById('stackingAlert');
     const drawStack = gameState.turnState.drawStack || 0;
-    const isStackingEnabled = gameState.settings ? gameState.settings.stacking : true;
+const isStackingEnabled = roomSettings.stacking !== false; // يقرأ من الإعدادات الصحيحة
 
     if (currentTurnId === playerId && drawStack > 0 && isStackingEnabled) {
         stackingAlert.style.display = 'flex';
@@ -441,7 +443,7 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     let skipNext = false;
     let addedStack = 0;
     const card = parseCard(cardStr);
-    const isStackingEnabled = gameState.settings ? gameState.settings.stacking : true;
+    const isStackingEnabled = roomSettings.stacking !== false;
 
     // منطق الماسح: يصفر التراكم تماماً
     let newDrawStack = (gameState.turnState.drawStack || 0);
@@ -465,8 +467,7 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     
     myHand.splice(cardIndex, 1);
     // --- منطق الفحص للأنظمة ---
-    const isPointsMode = gameState.settings && gameState.settings.points === true;
-    let isGameOver = false;
+const isPointsMode = roomSettings.points === true;    let isGameOver = false;
     let myRank = null;
 
     if (myHand.length === 0) {
@@ -598,6 +599,9 @@ onValue(gameRef, (snap) => {
     } else {
         renderGame();
     }
+});
+onValue(settingsRef, (snap) => {
+    roomSettings = snap.val() || {};
 });
 // دالة إظهار الإشعارات على الشاشة
 window.showToast = function(msg) {
@@ -755,7 +759,7 @@ window.showLeaderboard = function() {
     const systemTypeElement = document.getElementById('leaderboardSystemType');
     
     // تأكد من قراءة الإعدادات بشكل صحيح (في حال كانت داخل roomInfo أو game مباشرة)
-    const isPointsMode = gameState.settings && gameState.settings.points === true;
+const isPointsMode = roomSettings.points === true;
     
     let sortedPlayers = [...activePlayersList];
     tbody.innerHTML = '';
