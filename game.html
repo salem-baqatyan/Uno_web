@@ -205,15 +205,6 @@
         </div>
     </div>
 </div>
-<div id="gameResultModal" class="custom-modal-overlay">
-    <div class="custom-modal" style="max-width: 350px;">
-        <h2 id="resultTitle" style="color: var(--uno-yellow); margin-bottom: 10px;">🏆 ترتيب اللاعبين</h2>
-        <div id="resultsList" style="text-align: right; margin-bottom: 20px; max-height: 300px; overflow-y: auto;">
-            </div>
-        <button class="btn-confirm" onclick="location.reload()" style="width: 100%;">العودة للوبي</button>
-    </div>
-</div>
-
 </div>
 
 <script type="module">
@@ -467,42 +458,6 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     };
 
     await update(ref(db), updates);
-    // تحقق من الفوز بعد لعب البطاقة
-if (myHand.length === 0) {
-    const isPointsSystem = gameState.settings?.points || false;
-
-    if (isPointsSystem) {
-        // --- نظام النقاط: تنتهي اللعبة فوراً للجميع ---
-        let finalResults = [];
-        Object.keys(playersData).forEach(id => {
-            const p = playersData[id];
-            const score = (id === playerId) ? 0 : calculatePlayerPoints(p.hand || []);
-            finalResults.push({ name: p.name, score: score, id: id });
-        });
-        
-        // ترتيب تصاعدي (الأقل نقاط هو الأول)
-        finalResults.sort((a, b) => a.score - b.score);
-        await update(ref(db, `rooms/${roomId}/game`), { status: "finished", results: finalResults });
-
-    } else {
-        // --- نظام الترتيب التتابعي: يخرج لاعب وتستمر اللعبة ---
-        let winners = gameState.winners || [];
-        winners.push({ id: playerId, name: playersData[playerId].name, rank: winners.length + 1 });
-        
-        const remainingPlayers = activePlayersList.filter(p => !winners.find(w => w.id === p.id));
-        
-        if (remainingPlayers.length <= 1) {
-            // إضافة آخر لاعب متبقي للمراكز
-            if(remainingPlayers[0]) {
-                winners.push({ id: remainingPlayers[0].id, name: remainingPlayers[0].name, rank: winners.length + 1 });
-            }
-            await update(ref(db, `rooms/${roomId}/game`), { status: "finished", winners: winners });
-        } else {
-            // اللعبة مستمرة، تحديث قائمة الفائزين فقط
-            await update(ref(db, `rooms/${roomId}/game`), { winners: winners });
-        }
-    }
-}
 }
 
 // دالة قبول التراكم والسحب (مربوطة بالزر الأحمر)
@@ -616,13 +571,7 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
     for(let i=config.l-1; i>=0; i--) positions.push({s:'left', t:(100/(config.l+1))*(i+1)});
     for(let i=0; i<config.t; i++) positions.push({s:'top', l:(100/(config.t+1))*(i+1)});
     for(let i=0; i<config.r; i++) positions.push({s:'right', t:(100/(config.r+1))*(i+1)});
-    const winners = gameState?.winners || [];
-    const isWinner = winners.find(w => w.id === p.id);
 
-    if (isWinner) {
-        seat.style.filter = "grayscale(100%) opacity(0.5)";
-        seat.style.pointerEvents = "none";
-    }
     playersArray.forEach((p, i) => {
         if (!positions[i]) return;
         const pos = positions[i];
@@ -712,39 +661,6 @@ window.closeChallengeModal = function(result) {
         challengeResolver = null;
     }
 };
-function calculatePlayerPoints(hand) {
-    let total = 0;
-    hand.forEach(cardStr => {
-        const card = parseCard(cardStr);
-        if (card.isEraser) total += 50;
-        else if (card.value === "+4" || card.symbol === "Color") total += 50; // البطاقات السوداء
-        else if (card.value === "+2" || card.value === "⊘" || card.value === "↻") total += 20; // الأكشن
-        else if (!isNaN(parseInt(card.value))) total += parseInt(card.value); // الأرقام
-    });
-    return total;
-}
-onValue(ref(db, `rooms/${roomId}/game/status`), (snap) => {
-    if (snap.val() === "finished") {
-        showFinalResults();
-    }
-});
-
-async function showFinalResults() {
-    const gameSnap = await get(ref(db, `rooms/${roomId}/game`));
-    const data = gameSnap.val();
-    const listContainer = document.getElementById('resultsList');
-    listContainer.innerHTML = '';
-    
-    let displayList = [];
-    if (data.results) { // نظام النقاط
-        displayList = data.results.map((r, i) => `<div>#${i+1} ${r.name} (${r.score} نقطة)</div>`);
-    } else if (data.winners) { // النظام التتابعي
-        displayList = data.winners.map(w => `<div>#${w.rank} ${w.name}</div>`);
-    }
-
-    listContainer.innerHTML = displayList.join('<hr style="border:0.1px solid #333">');
-    document.getElementById('gameResultModal').style.display = 'flex';
-}
 </script>
 </body>
 </html>
