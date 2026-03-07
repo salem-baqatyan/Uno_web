@@ -157,6 +157,26 @@
 .btn-cancel { background: #444; color: white; }
 .btn-confirm { background: var(--uno-red); color: white; border: 1px solid #fff; }
 
+/* --- لوحة النتائج النهائية --- */
+.results-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 20000; padding: 20px;
+}
+.results-card {
+    background: #1a1a1a; border: 3px solid var(--uno-yellow); border-radius: 20px;
+    width: 100%; max-width: 350px; padding: 20px; text-align: center;
+}
+.results-table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+.results-table th { color: var(--uno-yellow); border-bottom: 1px solid #333; padding: 10px; }
+.results-table td { padding: 12px; border-bottom: 1px dotted #222; }
+.rank-1 { color: #ffd700; font-weight: bold; } /* ذهبي للمركز الأول */
+
+.player-disabled { filter: grayscale(1) opacity(0.5); pointer-events: none; }
+.winner-tag { 
+    position: absolute; top: -10px; background: gold; color: black; 
+    font-size: 0.6rem; padding: 2px 5px; border-radius: 5px; font-weight: bold;
+}
 </style>
 </head>
 <body>
@@ -203,6 +223,22 @@
             <button class="btn-cancel" onclick="closeChallengeModal(false)">إلغاء</button>
             <button class="btn-confirm" onclick="closeChallengeModal(true)">موافق، اعترض!</button>
         </div>
+    </div>
+</div>
+<div id="resultsModal" class="results-overlay">
+    <div class="results-card">
+        <h2 id="resultTitle">🎉 نهاية اللعبة 🎉</h2>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>الترتيب</th>
+                    <th>اللاعب</th>
+                    <th id="scoreColumnHeader">النقاط</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+        <button class="accept-stack-btn" style="margin-top:20px; width:100%" onclick="location.reload()">العودة للوبي</button>
     </div>
 </div>
 </div>
@@ -333,6 +369,14 @@ function renderGame() {
         const action = (currentTurnId === playerId) ? () => handlePlayCard(cardStr, index) : null;
         handContainer.appendChild(createCardElement(cardStr, index + 1, action));
     });
+    // داخل فور إيتش في دالة layoutPlayers
+const winnersList = gameState?.winners || [];
+const isOut = winnersList.includes(p.id);
+
+if (isOut) {
+    seat.classList.add('player-disabled');
+    seat.innerHTML += `<div class="winner-tag">تم الخروج (${getOrdinal(winnersList.indexOf(p.id)+1)})</div>`;
+}
     // إظهار التراكم إذا كان مفعلاً
     const stackingAlert = document.getElementById('stackingAlert');
     const drawStack = gameState.turnState.drawStack || 0;
@@ -357,10 +401,19 @@ window.selectColor = function(color) {
 };
 
 function getNextPlayerId(skip, currentDirection) {
+    const winners = gameState.winners || [];
     const idx = activePlayersList.findIndex(p => p.id === gameState.turnState.currentTurnId);
     let step = currentDirection * (skip ? 2 : 1);
+    
     let nextIdx = (idx + step) % activePlayersList.length;
     if (nextIdx < 0) nextIdx += activePlayersList.length;
+
+    // إذا كان اللاعب التالي قد فاز وخرج، نبحث عن الذي يليه
+    while (winners.includes(activePlayersList[nextIdx].id)) {
+        nextIdx = (nextIdx + currentDirection) % activePlayersList.length;
+        if (nextIdx < 0) nextIdx += activePlayersList.length;
+    }
+    
     return activePlayersList[nextIdx].id;
 }
 
@@ -661,6 +714,89 @@ window.closeChallengeModal = function(result) {
         challengeResolver = null;
     }
 };
+// دالة حساب قيمة بطاقة واحدة حسب نظام النقاط
+function getCardPoints(cardStr) {
+    const card = parseCard(cardStr);
+    if (card.isWild) return 50; // السوداء (تغيير لون، +4، ماسح)
+    if (["⊘", "↻", "+2"].includes(card.value)) return 20; // الأكشن
+    return parseInt(card.value) || 0; // الأرقام 0-9
+}
+
+// مراقبة حالة الفوز
+onValue(gameRef, async (snap) => {
+    const data = snap.val();
+    if (!data) return;
+
+    const isPointsSystem = data.settings?.points || false;
+    const winnersList = data.winners || []; // مصفوفة لتخزين من خرجوا بالترتيب
+
+    // 1. نظام النقاط: تنتهي اللعبة فور فوز أول لاعب
+    if (isPointsSystem) {
+        const firstWinner = activePlayersList.find(p => p.handCount === 0);
+        if (firstWinner) {
+            showFinalResults(true); // عرض النتائج بنظام النقاط
+        }
+    } 
+    // 2. نظام الترتيب التتابعي
+    else {
+        const newlyFinished = activePlayersList.find(p => p.handCount === 0 && !winnersList.includes(p.id));
+        if (newlyFinished) {
+            const updatedWinners = [...winnersList, newlyFinished.id];
+            await update(ref(db, `rooms/${roomId}/game`), { winners: updatedWinners });
+            
+            // إذا لم يتبق سوى لاعب واحد، تنتهي اللعبة
+            if (updatedWinners.length >= activePlayersList.length - 1) {
+                showFinalResults(false);
+            }
+        }
+    }
+});
+
+function showFinalResults(isPointsSystem) {
+    const modal = document.getElementById('resultsModal');
+    const body = document.getElementById('resultsBody');
+    const header = document.getElementById('scoreColumnHeader');
+    body.innerHTML = '';
+    
+    let leaderboard = [];
+
+    if (isPointsSystem) {
+        header.innerText = "النقاط";
+        leaderboard = activePlayersList.map(p => {
+            let total = 0;
+            if (p.handCount > 0 && p.hand) {
+                p.hand.forEach(c => total += getCardPoints(c));
+            }
+            return { name: p.name, score: total, id: p.id };
+        }).sort((a, b) => a.score - b.score);
+    } else {
+        header.innerText = "المركز";
+        const winners = gameState.winners || [];
+        // إضافة من فازوا بالترتيب
+        winners.forEach((id, index) => {
+            leaderboard.push({ name: playersData[id].name, score: index + 1, id: id });
+        });
+        // إضافة الخاسر الأخير
+        const loser = activePlayersList.find(p => !winners.includes(p.id));
+        if (loser) leaderboard.push({ name: loser.name, score: winners.length + 1, id: loser.id });
+    }
+
+    leaderboard.forEach((entry, idx) => {
+        const row = `<tr>
+            <td class="${idx===0?'rank-1':''}">${idx + 1}</td>
+            <td>${entry.name}</td>
+            <td>${isPointsSystem ? entry.score : getOrdinal(entry.score)}</td>
+        </tr>`;
+        body.innerHTML += row;
+    });
+
+    modal.style.display = 'flex';
+}
+
+function getOrdinal(n) {
+    const ordinals = ["-", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
+    return ordinals[n] || n;
+}
 </script>
 </body>
 </html>
