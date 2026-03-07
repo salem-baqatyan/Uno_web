@@ -156,7 +156,11 @@
 .custom-modal-actions button:active { transform: scale(0.95); }
 .btn-cancel { background: #444; color: white; }
 .btn-confirm { background: var(--uno-red); color: white; border: 1px solid #fff; }
-
+/* --- 6. لوحة النتائج واللاعب المنسحب --- */
+.leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 15px; color: white; }
+.leaderboard-table th, .leaderboard-table td { border-bottom: 1px solid #444; padding: 10px; text-align: center; }
+.leaderboard-table th { color: var(--uno-yellow); }
+.finished-player { filter: grayscale(100%) opacity(0.5); pointer-events: none; }
 </style>
 </head>
 <body>
@@ -202,6 +206,20 @@
         <div class="custom-modal-actions">
             <button class="btn-cancel" onclick="closeChallengeModal(false)">إلغاء</button>
             <button class="btn-confirm" onclick="closeChallengeModal(true)">موافق، اعترض!</button>
+        </div>
+    </div>
+</div>
+<div id="leaderboardModal" class="custom-modal-overlay">
+    <div class="custom-modal" style="max-width: 400px;">
+        <h3>🏆 النتائج النهائية 🏆</h3>
+        <table class="leaderboard-table">
+            <thead>
+                <tr id="leaderboardHeaders"></tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+        </table>
+        <div class="custom-modal-actions" style="margin-top: 20px;">
+            <button class="btn-cancel" onclick="window.location.href='lobby.html'">العودة للوبي</button>
         </div>
     </div>
 </div>
@@ -357,10 +375,24 @@ window.selectColor = function(color) {
 };
 
 function getNextPlayerId(skip, currentDirection) {
-    const idx = activePlayersList.findIndex(p => p.id === gameState.turnState.currentTurnId);
-    let step = currentDirection * (skip ? 2 : 1);
-    let nextIdx = (idx + step) % activePlayersList.length;
-    if (nextIdx < 0) nextIdx += activePlayersList.length;
+    let idx = activePlayersList.findIndex(p => p.id === gameState.turnState.currentTurnId);
+    let foundCount = 0;
+    let targetCount = skip ? 2 : 1;
+    let nextIdx = idx;
+    
+    // البحث عن اللاعب القادم مع تخطي من انتهت أوراقه
+    while (foundCount < targetCount) {
+        nextIdx = (nextIdx + currentDirection) % activePlayersList.length;
+        if (nextIdx < 0) nextIdx += activePlayersList.length;
+        
+        // إذا اللاعب لم ينهي بطاقاته، نعتبره موجوداً
+        if (!activePlayersList[nextIdx].finishedRank) {
+            foundCount++;
+        }
+        
+        // أمان لتجنب Loop لا نهائي في حال بقي لاعب واحد فقط
+        if (nextIdx === idx) break; 
+    }
     return activePlayersList[nextIdx].id;
 }
 
@@ -425,11 +457,34 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     let discardPile = [...(gameState.discardPile || [])];
     
     myHand.splice(cardIndex, 1);
+    // --- منطق الفحص للأنظمة ---
+    const isPointsMode = gameState.settings && gameState.settings.points === true;
+    let isGameOver = false;
+    let myRank = null;
+
+    if (myHand.length === 0) {
+        if (isPointsMode) {
+            // نظام النقاط: أول شخص ينهي، تتجمد اللعبة فوراً
+            isGameOver = true;
+        } else {
+            // النظام التتابعي: تسجيل ترتيب اللاعب
+            const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
+            myRank = currentFinishedCount + 1;
+            
+            // إذا بقي لاعب واحد فقط بأوراق، تنتهي اللعبة
+            if (activePlayersList.length - myRank <= 1) {
+                isGameOver = true;
+            }
+        }
+    }
+    // -------------------------
     discardPile.push(cardStr);
 
     const updates = {};
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+
+    if (myRank) updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
 
     // معالجة السحب المباشر إذا كان التراكم مغلقاً
     if (addedStack > 0 && !isStackingEnabled) {
@@ -452,10 +507,16 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
 
     updates[`rooms/${roomId}/game/deck`] = deck;
     updates[`rooms/${roomId}/game/discardPile`] = discardPile;
-    updates[`rooms/${roomId}/game/turnState`] = {
-        currentTurnId: nextPlayerId, direction: nextDirection, selectedColor: chosenColor,
-        drawStack: newDrawStack, lastUpdated: serverTimestamp()
-    };
+
+    // إذا انتهت اللعبة، نغير الحالة فقط ولا نحدث الدور
+    if (isGameOver) {
+        updates[`rooms/${roomId}/game/status`] = 'finished';
+    } else {
+        updates[`rooms/${roomId}/game/turnState`] = {
+            currentTurnId: nextPlayerId, direction: nextDirection, selectedColor: chosenColor,
+            drawStack: newDrawStack, lastUpdated: serverTimestamp()
+        };
+    }
 
     await update(ref(db), updates);
 }
@@ -524,7 +585,12 @@ onValue(playersRef, (snap) => {
 
 onValue(gameRef, (snap) => {
     gameState = snap.val();
-    renderGame();
+    // إذا انتهت اللعبة، نعرض اللوحة بدلاً من تحديث الطاولة
+    if (gameState && gameState.status === 'finished') {
+        showLeaderboard();
+    } else {
+        renderGame();
+    }
 });
 // دالة إظهار الإشعارات على الشاشة
 window.showToast = function(msg) {
@@ -580,8 +646,8 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         // التحقق مما إذا كان لديه بطاقة واحدة لتفعيل النبض الأحمر
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
         
-        seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId?'is-turn':''}`;
-        seat.style.cssText = pos.s==='right'?`top:${pos.t}%;right:15px;transform:translateY(-50%);`:pos.s==='left'?`top:${pos.t}%;left:15px;transform:translateY(-50%);`:`top:20px;left:${pos.l}%;transform:translateX(-50%);`;
+        const isFinished = p.finishedRank ? 'finished-player' : '';
+        seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId && !p.finishedRank ?'is-turn':''} ${isFinished}`;        seat.style.cssText = pos.s==='right'?`top:${pos.t}%;right:15px;transform:translateY(-50%);`:pos.s==='left'?`top:${pos.t}%;left:15px;transform:translateY(-50%);`:`top:20px;left:${pos.l}%;transform:translateX(-50%);`;
         
         // أضفنا حدث onclick لتقديم الاعتراض
         seat.innerHTML = `
@@ -660,6 +726,49 @@ window.closeChallengeModal = function(result) {
         challengeResolver(result); // نرسل النتيجة (true أو false)
         challengeResolver = null;
     }
+};
+// حساب نقاط اليد (لنظام النقاط)
+function calculateHandPoints(hand) {
+    let total = 0;
+    if (!hand) return 0;
+    hand.forEach(cardStr => {
+        const c = parseCard(cardStr);
+        if (c.isWild) total += 50;
+        else if (["⊘", "↻", "+2"].includes(c.value)) total += 20;
+        else if (!isNaN(parseInt(c.value))) total += parseInt(c.value);
+    });
+    return total;
+}
+
+// عرض لوحة النتائج
+window.showLeaderboard = function() {
+    const modal = document.getElementById('leaderboardModal');
+    const tbody = document.getElementById('leaderboardBody');
+    const headers = document.getElementById('leaderboardHeaders');
+    tbody.innerHTML = '';
+    
+    let sortedPlayers = [...activePlayersList];
+    const isPointsMode = gameState.settings && gameState.settings.points === true;
+    
+    if (isPointsMode) {
+        // ترتيب نظام النقاط (الأقل نقاطاً يفوز)
+        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>النقاط</th>`;
+        sortedPlayers.forEach(p => p.points = calculateHandPoints(p.hand));
+        sortedPlayers.sort((a, b) => a.points - b.points);
+        sortedPlayers.forEach((p, idx) => {
+            tbody.innerHTML += `<tr><td>${idx+1}</td><td>${p.name}</td><td>${p.points}</td></tr>`;
+        });
+    } else {
+        // ترتيب النظام التتابعي (حسب من خرج أولاً)
+        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>الترتيب</th>`;
+        sortedPlayers.sort((a, b) => (a.finishedRank || 99) - (b.finishedRank || 99));
+        const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
+        sortedPlayers.forEach((p, idx) => {
+            let rankText = p.finishedRank ? rankNames[p.finishedRank - 1] : "الأخير";
+            tbody.innerHTML += `<tr><td>${idx+1}</td><td>${p.name}</td><td>${rankText}</td></tr>`;
+        });
+    }
+    modal.style.display = 'flex';
 };
 </script>
 </body>
