@@ -161,6 +161,11 @@
 .leaderboard-table th, .leaderboard-table td { border-bottom: 1px solid #444; padding: 10px; text-align: center; }
 .leaderboard-table th { color: var(--uno-yellow); }
 .finished-player { filter: grayscale(100%) opacity(0.5); pointer-events: none; }
+.is-me-row {
+    background-color: rgba(255, 215, 0, 0.15); /* لون أصفر خفيف */
+    color: var(--uno-yellow);
+    font-weight: bold;
+}
 </style>
 </head>
 <body>
@@ -212,6 +217,8 @@
 <div id="leaderboardModal" class="custom-modal-overlay">
     <div class="custom-modal" style="max-width: 400px;">
         <h3>🏆 النتائج النهائية 🏆</h3>
+        <p id="leaderboardSystemType" style="color: #bbb; font-size: 0.85rem; margin-top: -10px; margin-bottom: 20px;"></p>
+        
         <table class="leaderboard-table">
             <thead>
                 <tr id="leaderboardHeaders"></tr>
@@ -745,29 +752,64 @@ window.showLeaderboard = function() {
     const modal = document.getElementById('leaderboardModal');
     const tbody = document.getElementById('leaderboardBody');
     const headers = document.getElementById('leaderboardHeaders');
-    tbody.innerHTML = '';
+    const systemTypeElement = document.getElementById('leaderboardSystemType');
     
-    let sortedPlayers = [...activePlayersList];
+    // تأكد من قراءة الإعدادات بشكل صحيح (في حال كانت داخل roomInfo أو game مباشرة)
     const isPointsMode = gameState.settings && gameState.settings.points === true;
     
+    let sortedPlayers = [...activePlayersList];
+    tbody.innerHTML = '';
+
     if (isPointsMode) {
-        // ترتيب نظام النقاط (الأقل نقاطاً يفوز)
-        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>النقاط</th>`;
-        sortedPlayers.forEach(p => p.points = calculateHandPoints(p.hand));
-        sortedPlayers.sort((a, b) => a.points - b.points);
-        sortedPlayers.forEach((p, idx) => {
-            tbody.innerHTML += `<tr><td>${idx+1}</td><td>${p.name}</td><td>${p.points}</td></tr>`;
+        // --- 1. نظام النقاط ---
+        systemTypeElement.innerText = "نظام الفوز: النقاط (الترتيب بالرصيد)";
+        headers.innerHTML = `<th>الرقم</th><th>اللاعب</th><th>النقاط</th>`;
+        
+        // حساب النقاط لكل لاعب
+        sortedPlayers.forEach(p => {
+            p.points = calculateHandPoints(p.hand);
         });
-    } else {
-        // ترتيب النظام التتابعي (حسب من خرج أولاً)
-        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>الترتيب</th>`;
-        sortedPlayers.sort((a, b) => (a.finishedRank || 99) - (b.finishedRank || 99));
-        const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
+        
+        // ترتيب اللاعبين من الأقل نقاطاً إلى الأعلى
+        sortedPlayers.sort((a, b) => a.points - b.points);
+        
+        // رسم الجدول
         sortedPlayers.forEach((p, idx) => {
-            let rankText = p.finishedRank ? rankNames[p.finishedRank - 1] : "الأخير";
-            tbody.innerHTML += `<tr><td>${idx+1}</td><td>${p.name}</td><td>${rankText}</td></tr>`;
+            const isMe = p.id === playerId;
+            const rowClass = isMe ? 'is-me-row' : '';
+            const playerName = isMe ? `${p.name} (أنت)` : p.name;
+            
+            // المركز الأول (idx === 0) دائماً يأخذ 0 نقاط كما طلبت
+            const finalPoints = idx === 0 ? 0 : p.points;
+            
+            tbody.innerHTML += `<tr class="${rowClass}"><td>${idx + 1}</td><td>${playerName}</td><td>${finalPoints}</td></tr>`;
+        });
+
+    } else {
+        // --- 2. النظام التتابعي ---
+        systemTypeElement.innerText = "نظام الفوز: التتابعي (الخروج المتسلسل)";
+        headers.innerHTML = `<th>الرقم</th><th>اللاعب</th><th>الترتيب</th>`;
+        
+        // الترتيب حسب من خرج أولاً (من لا يملك finishedRank نعتبره رقم 999 ليكون في النهاية)
+        sortedPlayers.sort((a, b) => (a.finishedRank || 999) - (b.finishedRank || 999));
+        
+        // مصفوفة الأسماء التتابعية
+        const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
+        
+        // رسم الجدول
+        sortedPlayers.forEach((p, idx) => {
+            const isMe = p.id === playerId;
+            const rowClass = isMe ? 'is-me-row' : '';
+            const playerName = isMe ? `${p.name} (أنت)` : p.name;
+            
+            // نأخذ الاسم من المصفوفة حسب رقم الاندكس الخاص به في المصفوفة المرتبة
+            // هذا يلغي تماماً كلمة "الأخير" ويضمن تسلسل دقيق (الأول، الثاني، الثالث...)
+            const rankText = rankNames[idx] || (idx + 1); 
+            
+            tbody.innerHTML += `<tr class="${rowClass}"><td>${idx + 1}</td><td>${playerName}</td><td>${rankText}</td></tr>`;
         });
     }
+    
     modal.style.display = 'flex';
 };
 </script>
