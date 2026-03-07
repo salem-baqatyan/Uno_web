@@ -135,6 +135,28 @@
     animation: pulse-red 1s infinite; border: 1px solid white;
 }
 .player-seat .avatar-wrap { cursor: pointer; /* جعل الأفاتار قابل للضغط */ }
+
+/* --- Custom Modal --- */
+.custom-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px);
+    display: none; justify-content: center; align-items: center; z-index: 10000;
+}
+.custom-modal {
+    background: #111; border: 2px solid var(--uno-yellow); border-radius: 15px;
+    padding: 20px; width: 85%; max-width: 320px; text-align: center; color: white;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.9); transform: scale(0.9); animation: pop-in 0.2s forwards;
+}
+@keyframes pop-in { to { transform: scale(1); } }
+.custom-modal h3 { margin-top: 0; color: var(--uno-red); font-size: 1.2rem; }
+.custom-modal p { font-size: 0.9rem; line-height: 1.5; margin-bottom: 20px; }
+.custom-modal-actions { display: flex; justify-content: space-around; gap: 10px; }
+.custom-modal-actions button {
+    flex: 1; padding: 10px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s;
+}
+.custom-modal-actions button:active { transform: scale(0.95); }
+.btn-cancel { background: #444; color: white; }
+.btn-confirm { background: var(--uno-red); color: white; border: 1px solid #fff; }
+
     </style>
 </head>
 <body>
@@ -173,6 +195,16 @@
 
     </div>
     <div id="toastContainer"></div>
+    <div id="challengeModal" class="custom-modal-overlay">
+    <div class="custom-modal">
+        <h3>تقديم اعتراض 🚨</h3>
+        <p id="challengeText"></p>
+        <div class="custom-modal-actions">
+            <button class="btn-cancel" onclick="closeChallengeModal(false)">إلغاء</button>
+            <button class="btn-confirm" onclick="closeChallengeModal(true)">موافق، اعترض!</button>
+        </div>
+    </div>
+</div>
 </div>
 
 <script type="module">
@@ -469,7 +501,7 @@ document.getElementById('deckPile').onclick = async () => {
     
     myHand.push(drawRes.drawnCards[0]);
 
-const updates = {};
+    const updates = {};
     updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
@@ -566,7 +598,7 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 window.handleChallenge = async function(targetId) {
     if (targetId === playerId) return; // لا يمكنك الاعتراض على نفسك
     
-    // التحقق أن الدور دورك
+    // التحقق أن الدور دورك (إذا لم يكن دورك لن تعمل)
     if (gameState.turnState.currentTurnId !== playerId) {
         return showToast("يمكنك تقديم اعتراض فقط عندما يكون الدور لك للعب!");
     }
@@ -574,9 +606,9 @@ window.handleChallenge = async function(targetId) {
     const targetPlayer = playersData[targetId];
     if (targetPlayer.handCount !== 1) return; // يعترض فقط على من لديه بطاقة واحدة
 
-    // رسالة التأكيد
-    const isSure = confirm(`هل أنت موافق على تقديم اعتراض للاعب (${targetPlayer.name}) بأنه لم يضغط زر الاونو؟\n\nستعاقب بسحب بطاقة إذا أثبت عكس ذلك.`);
-    if (!isSure) return;
+    // استدعاء النافذة المخصصة وانتظار قرار اللاعب
+    const isSure = await openChallengeModal(targetPlayer.name);
+    if (!isSure) return; // إذا ضغط "إلغاء"، نوقف العملية
 
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
@@ -584,14 +616,14 @@ window.handleChallenge = async function(targetId) {
     let drawRes;
 
     if (targetPlayer.saidUno === true) {
-        // ❌ اعتراض خاطئ: المعتَرَض عليه قال أونو، المعتَرِض (أنت) تسحب بطاقة
+        // ❌ اعتراض خاطئ: المعتَرَض عليه قال أونو، المعتَرِض (أنت) تسحب بطاقة كعقاب
         drawRes = extractCardsToDraw(1, deck, discardPile);
-        myHand = myHand.concat(drawRes.drawnCards);
+        myHand = myHand.concat(drawRes.drawnCards); // إضافة البطاقة ليدك
         updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
         updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
-        updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false; // تصفير حالتك
+        
         updates[`rooms/${roomId}/game/toastMessage`] = { 
-            msg: `❌ اعتراض خاطئ! ${targetPlayer.name} قال UNO. تم معاقبة ${playersData[playerId].name} ببطاقة!`, 
+            msg: `❌ اعتراض خاطئ! ${targetPlayer.name} سبق وقال UNO. تم معاقبة ${playersData[playerId].name} ببطاقة!`, 
             time: Date.now() 
         };
     } else {
@@ -600,7 +632,7 @@ window.handleChallenge = async function(targetId) {
         let targetHand = (targetPlayer.hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetId}/hand`] = targetHand;
         updates[`rooms/${roomId}/players/${targetId}/handCount`] = targetHand.length;
-        updates[`rooms/${roomId}/players/${targetId}/saidUno`] = false; // تصفير حالته
+        
         updates[`rooms/${roomId}/game/toastMessage`] = { 
             msg: `🚨 صاااده! ${targetPlayer.name} نسي يقول UNO وسحب بطاقتين عقاب!`, 
             time: Date.now() 
@@ -610,6 +642,24 @@ window.handleChallenge = async function(targetId) {
     updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     await update(ref(db), updates);
+};
+let challengeResolver = null; // متغير لحفظ الرد
+
+window.openChallengeModal = function(targetName) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('challengeModal');
+        document.getElementById('challengeText').innerText = `هل أنت متأكد من تقديم اعتراض ضد (${targetName}) بأنه لم يضغط زر UNO؟\n\nستُعاقب بسحب بطاقة إذا كان قد ضغط الزر فعلاً!`;
+        overlay.style.display = 'flex';
+        challengeResolver = resolve; // نعلق الرد حتى يضغط المستخدم زر
+    });
+};
+
+window.closeChallengeModal = function(result) {
+    document.getElementById('challengeModal').style.display = 'none';
+    if (challengeResolver) {
+        challengeResolver(result); // نرسل النتيجة (true أو false)
+        challengeResolver = null;
+    }
 };
 </script>
 </body>
