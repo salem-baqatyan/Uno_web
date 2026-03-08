@@ -336,46 +336,54 @@
 
     // إنشاء غرفة (مع فحص التكرار + دعم الخصوصية)
     window.createRoom = async () => {
-        const dbRef = ref(db);
-        let newId = "";
-        let isUnique = false;
+    const createBtn = document.querySelector('.btn-outline');
+    const dbRef = ref(db);
+    let newId = "";
+    let isUnique = false;
 
-        const createBtn = document.querySelector('.btn-outline');
+    try {
+        // 1. استخراج القيم من الواجهة أولاً
+        const roomTypeInput = document.querySelector('input[name="roomType"]:checked');
+        if (!roomTypeInput) {
+            showToast("⚠️ يرجى اختيار نوع الغرفة");
+            return;
+        }
+        const selectedType = roomTypeInput.value;
+
+        // 2. تحديث واجهة الزر
         createBtn.innerText = "جاري الحجز...";
         createBtn.disabled = true;
 
+        // 3. توليد المعرف الفريد
         while (!isUnique) {
-            // توليد رمز بالكبير
             newId = Math.random().toString(36).substring(2, 8).toUpperCase();
             const snapshot = await get(child(dbRef, `rooms/${newId}`));
             if (!snapshot.exists()) isUnique = true;
         }
+
         const now = Date.now();
+
+        // 4. حفظ البيانات كاملة في عملية واحدة (أسرع وأفضل)
         await set(ref(db, `rooms/${newId}`), {
-            settings: { visibility: selectedType, points: false },
-            lastHeartbeat: now, // أول نبضة للغرفة
+            settings: { 
+                visibility: selectedType, 
+                points: false 
+            },
+            lastHeartbeat: now,
             status: 'lobby',
             createdAt: now
         });
-        location.href = `lobby.html?r=${newId}`;
-        
-        const selectedType = document.querySelector('input[name="roomType"]:checked').value;
 
-        // حجز الغرفة في الداتابيز أولاً لضمان حفظ الـ visibility
-        try {
-            await set(ref(db, `rooms/${newId}/settings`), {
-                visibility: selectedType,
-                points: false,
-                createdAt: Date.now()
-            });
-            location.href = `lobby.html?r=${newId}&type=${selectedType}`;
-        } catch (e) {
-            showToast("❌ فشل إنشاء الغرفة");
-            createBtn.disabled = false;
-            createBtn.innerText = "إنشاء غرفة";
-        }
-    };
+        // 5. الانتقال لصفحة اللوبي
+        location.href = `lobby.html?r=${newId}&type=${selectedType}`;
 
+    } catch (e) {
+        console.error(e);
+        showToast("❌ فشل إنشاء الغرفة");
+        createBtn.disabled = false;
+        createBtn.innerText = "إنشاء غرفة";
+    }
+};
     // عرض الغرف العامة فقط
     const roomsRef = ref(db, 'rooms');
     onValue(roomsRef, (snapshot) => {
