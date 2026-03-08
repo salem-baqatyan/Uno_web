@@ -166,6 +166,40 @@
     color: var(--uno-yellow);
     font-weight: bold;
 }
+/* --- تنسيقات عداد لوحة النتائج --- */
+.timer-container {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    margin: 15px auto 0;
+}
+.timer-svg {
+    width: 60px;
+    height: 60px;
+    transform: rotate(-90deg);
+}
+.timer-circle-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 4;
+}
+.timer-circle-fg {
+    fill: none;
+    stroke: var(--uno-yellow, #ffc107);
+    stroke-width: 4;
+    stroke-dasharray: 176;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 1s linear;
+}
+#countdown-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: white;
+}
 </style>
 </head>
 <body>
@@ -225,10 +259,16 @@
             </thead>
             <tbody id="leaderboardBody"></tbody>
         </table>
-        <div class="custom-modal-actions" style="margin-top: 20px;">
-            <button class="btn-cancel" onclick="window.location.href='lobby.html'">العودة للوبي</button>
-        </div>
-    </div>
+        <div id="countdown-wrapper" style="text-align:center; margin-top:20px;">
+            <div class="timer-container">
+                <svg class="timer-svg">
+                    <circle class="timer-circle-bg" cx="30" cy="30" r="28"></circle>
+                    <circle id="timer-bar" class="timer-circle-fg" cx="30" cy="30" r="28"></circle>
+                </svg>
+                <div id="countdown-text">10</div>
+            </div>
+            <p style="font-size:0.8rem; opacity:0.8; margin-top:10px; color:#ddd;">العودة للردهة تلقائياً...</p>
+        </div>    </div>
 </div>
 </div>
 
@@ -751,16 +791,16 @@ function calculateHandPoints(hand) {
     return total;
 }
 
-// عرض لوحة النتائج
+// متغير لحفظ العداد حتى لا يتداخل إذا تم استدعاء الدالة مرتين
+let leaderboardInterval = null; 
+
 window.showLeaderboard = function() {
     const modal = document.getElementById('leaderboardModal');
     const tbody = document.getElementById('leaderboardBody');
     const headers = document.getElementById('leaderboardHeaders');
     const systemTypeElement = document.getElementById('leaderboardSystemType');
     
-    // تأكد من قراءة الإعدادات بشكل صحيح (في حال كانت داخل roomInfo أو game مباشرة)
-const isPointsMode = roomSettings.points === true;
-    
+    const isPointsMode = roomSettings.points === true;
     let sortedPlayers = [...activePlayersList];
     tbody.innerHTML = '';
 
@@ -815,7 +855,68 @@ const isPointsMode = roomSettings.points === true;
     }
     
     modal.style.display = 'flex';
+
+    // ==========================================
+    // --- منطق العد التنازلي والانتقال التلقائي ---
+    // ==========================================
+    let timeLeft = 10;
+    const timerBar = document.getElementById('timer-bar');
+    const countdownText = document.getElementById('countdown-text');
+    const totalOffset = 176;
+
+    // تصفير العداد بصرياً في حال ظهرت اللوحة مرة أخرى
+    if (timerBar) timerBar.style.strokeDashoffset = 0;
+    if (countdownText) countdownText.innerText = timeLeft;
+
+    if (leaderboardInterval) clearInterval(leaderboardInterval);
+
+    leaderboardInterval = setInterval(async () => {
+        timeLeft--;
+        if (countdownText) countdownText.innerText = timeLeft;
+        if (timerBar) {
+            timerBar.style.strokeDashoffset = totalOffset - (timeLeft * (totalOffset / 10));
+        }
+        
+        if (timeLeft <= 0) {
+            clearInterval(leaderboardInterval);
+            await handleAutoTransition();
+        }
+    }, 1000);
 };
+
+// دالة النقل والتصفير التي تُستدعى عند انتهاء الوقت
+async function handleAutoTransition() {
+    if (!playersData || !playersData[playerId]) return;
+
+    // تحديد من هو الأدمن بناءً على وقت الانضمام
+    const playerList = Object.values(playersData).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+    const isAdmin = (playerList.length > 0 && playerId === playerList[0].id);
+
+    // 1. تصفير بيانات اللاعب الخاصة باللعبة (حتى يبدأ الجولة القادمة نظيفاً) وتطبيق نقل الفريق
+    const playerUpdates = {
+        [`rooms/${roomId}/players/${playerId}/team`]: "spectators-list",
+        [`rooms/${roomId}/players/${playerId}/hand`]: null,
+        [`rooms/${roomId}/players/${playerId}/handCount`]: null,
+        [`rooms/${roomId}/players/${playerId}/finishedRank`]: null,
+        [`rooms/${roomId}/players/${playerId}/saidUno`]: null
+    };
+    await update(ref(db), playerUpdates);
+
+    // 2. إذا كان اللاعب هو الأدمن، يقوم بتصفير حالة الغرفة بالكامل
+    if (isAdmin) {
+        const roomUpdates = {
+            [`rooms/${roomId}/status`]: "lobby",
+            [`rooms/${roomId}/game/status`]: null,
+            [`rooms/${roomId}/game/turnState`]: null,
+            [`rooms/${roomId}/game/discardPile`]: null,
+            [`rooms/${roomId}/game/deck`]: null
+        };
+        await update(ref(db), roomUpdates);
+    }
+
+    // 3. توجيه اللاعب لصفحة الردهة
+    window.location.href = `lobby.html?r=${roomId}&p=${playerId}`;
+}
 </script>
 </body>
 </html>
