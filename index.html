@@ -104,13 +104,14 @@
 
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-   .skeleton-row {
-    height: 50px;
-    background: linear-gradient(90deg, #121212 25%, #1a1a1a 50%, #121212 75%);
+.skeleton-row {
+    height: 20px; /* تقليل الارتفاع ليناسب الصف */
+    width: 90%;
+    margin: 10px auto;
+    background: linear-gradient(90deg, #121212 25%, #222 50%, #121212 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
-    margin: 10px 0;
-    border-radius: 10px;
+    border-radius: 4px;
 }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
    </style>
@@ -238,20 +239,40 @@
     };
     // --- 3. تحسين الأداء + النبض (Query & Heartbeat) ---
     // جلب آخر 20 غرفة فقط تم تحديثها
+    // دالة لعرض تأثير التحميل (Skeleton)
+function showSkeleton() {
+    const tbody = document.getElementById('roomsListBody');
+    tbody.innerHTML = ''; // مسح المحتوى الحالي
+    for (let i = 0; i < 3; i++) { // عرض 3 صفوف وهمية
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td colspan="4">
+                <div class="skeleton-row"></div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    }
+}
+
+// استدعاء الدالة فوراً عند تشغيل الصفحة
+showSkeleton();
     const roomsQuery = query(
         ref(db, 'rooms'), 
         orderByChild('lastHeartbeat'), 
         limitToLast(20)
     );
 
-    onValue(roomsQuery, (snapshot) => {
-        const rooms = snapshot.val();
-        roomsListBody.innerHTML = '';
+onValue(roomsRef, (snapshot) => {
+    const rooms = snapshot.val();
+    const tbody = document.getElementById('roomsListBody');
+    
+    // بمجرد وصول أي استجابة (حتى لو فارغة) نمسح الـ Skeleton
+    tbody.innerHTML = ''; 
 
-        if (!rooms) {
-            roomsListBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:40px; color:#444;">لا توجد غرف متاحة</td></tr>';
-            return;
-        }
+    if (!rooms) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:40px; color:#444;">لا توجد جلسات مفتوحة</td></tr>';
+        return;
+    }
 
         // تحويل الكائن لمصفوفة وترتيبها (الأحدث أولاً)
         const sortedRooms = Object.entries(rooms).reverse();
