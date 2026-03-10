@@ -3,22 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UNO Online - أونو أونلاين</title>
+    <title>UNO! Pro - الرئيسية</title>
     <style>
-        /* --- Global & Root --- */
         :root {
             --bg-dark: #050505; 
             --panel-bg: #121212; 
-            --uno-red: #ff5555;
-            --uno-blue: #5555ff;
-            --uno-green: #55aa55;
-            --uno-yellow: #ffaa00;
             --orange-gradient: linear-gradient(135deg, #ffaa00 0%, #ff5500 100%);
+            --uno-yellow: #ffaa00;
             --text-gray: #888888;
             --mobile-max-width: 450px;
         }
 
-        * { box-sizing: border-box; font-family: 'Cairo', 'Segoe UI', sans-serif; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
         body { 
             margin: 0; background-color: var(--bg-dark); color: white; 
             display: flex; justify-content: center; align-items: center; height: 100dvh; overflow: hidden; 
@@ -26,155 +23,156 @@
 
         .mobile-wrapper {
             width: 100%; max-width: var(--mobile-max-width); height: 100dvh; background: #000;
-            display: flex; flex-direction: column; border-left: 1px solid #222; border-right: 1px solid #222;
-            position: relative; padding: 20px;
+            display: flex; flex-direction: column; border-left: 1px solid #333; border-right: 1px solid #333;
+            position: relative; overflow-y: auto; padding: 20px;
         }
 
-        .logo-section { text-align: center; margin-top: 0px; margin-bottom: 30px; }
-        .logo-title { 
-            font-size: 3rem; font-weight: 900; letter-spacing: -2px; 
-            background: var(--orange-gradient);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 8px rgba(255, 170, 0, 0.2));
+        /* --- Logo & Header --- */
+        .header-logo {
+            text-align: center; font-size: 2.5rem; font-weight: 900; margin-bottom: 30px;
+            color: transparent; background: var(--orange-gradient); -webkit-background-clip: text; background-clip: text;
         }
-        .logo-subtitle { color: #fff; font-size: 0.9rem; margin-top: -5px; font-weight: bold; letter-spacing: 3px; opacity: 0.8; }
 
-        .panel { background: var(--panel-bg); border-radius: 24px; padding: 20px; margin-bottom: 15px; border: 1px solid #222; }
-        .panel-title { font-size: 0.95rem; font-weight: bold; margin-bottom: 15px; color: #fff; display: flex; align-items: center; gap: 10px; }
+        /* --- Sections (Cards) --- */
+        .section-card {
+            background: var(--panel-bg); border: 1px solid #333; border-radius: 15px; 
+            padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .section-title { font-size: 1rem; font-weight: bold; margin-bottom: 15px; color: #ddd; }
+
+        /* --- Inputs & Buttons --- */
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        .input-text {
+            flex: 1; background: #1a1a1a; border: 1px solid #444; color: white; 
+            padding: 12px; border-radius: 10px; font-size: 1rem; outline: none; text-align: center;
+        }
+        .input-text:focus { border-color: var(--uno-yellow); }
+
+        .btn-action, .btn-outline {
+            width: 100%; padding: 15px; border-radius: 12px; font-weight: bold; 
+            cursor: pointer; font-size: 1.1rem; transition: 0.2s; border: none;
+        }
         
-        .input-group { display: flex; gap: 10px; }
-        .main-input { 
-            flex: 1; background: #000; border: 1.5px solid #333; color: white; 
-            padding: 14px; border-radius: 14px; font-size: 1rem; outline: none; transition: 0.3s;
-            text-transform: uppercase; /* يظهر الحروف كبيرة أثناء الكتابة */
-        }
-        .main-input:focus { border-color: var(--uno-yellow); box-shadow: 0 0 10px rgba(255, 170, 0, 0.2); }
-
-        .btn { border: none; border-radius: 14px; font-weight: 900; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; color: white; }
-        .btn-action { background: #fff; color: #000; padding: 12px 25px; box-shadow: 0 4px 0 #ccc; }
-        .btn-action:active { transform: translateY(2px); box-shadow: 0 2px 0 #ccc; }
-        
-        .btn-outline { 
-            background: var(--orange-gradient);
-            padding: 15px; width: 100%; margin-top: 15px; 
-            font-size: 1.1rem; text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        .btn-action {
+            background: var(--orange-gradient); color: white;
             box-shadow: 0 4px 15px rgba(255, 170, 0, 0.2);
         }
+        .btn-action:disabled { opacity: 0.7; cursor: not-allowed; }
 
-        .radio-container { display: flex; gap: 15px; margin-top: 5px; }
-        .radio-item { flex: 1; position: relative; }
-        .radio-item input { position: absolute; opacity: 0; cursor: pointer; }
-        .radio-label { 
-            display: block; border: 1.5px solid #333; padding: 12px; 
-            border-radius: 14px; text-align: center; font-size: 0.85rem; cursor: pointer; transition: 0.3s;
+        .btn-outline {
+            background: transparent; color: var(--uno-yellow); border: 2px solid var(--uno-yellow);
         }
-        .radio-item input:checked + .radio-label { 
-            border-color: var(--uno-yellow); background: rgba(255, 170, 0, 0.05); color: #fff; 
-        }
-        .radio-label span { display: block; font-size: 0.7rem; color: var(--text-gray); margin-top: 4px; }
 
-        .rooms-container { flex: 1; overflow-y: auto; margin-top: 5px; }
-        .rooms-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        .rooms-table th { text-align: right; color: var(--text-gray); padding: 15px 10px; border-bottom: 1px solid #222; position: sticky; top: 0; background: var(--panel-bg); z-index: 5; }
-        .rooms-table td { padding: 16px 10px; border-bottom: 1px solid #111; }
+        .icon-btn {
+            background: #222; border: 1px solid #444; color: white; border-radius: 10px;
+            padding: 0 15px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+
+        /* --- Radio Options --- */
+        .radio-group { display: flex; gap: 15px; margin-bottom: 15px; justify-content: center; }
+        .radio-label {
+            display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.9rem; color: #ccc;
+        }
+        .radio-label input[type="radio"] { accent-color: var(--uno-yellow); }
+
+        /* --- Rooms Table --- */
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: center; }
+        th { padding: 10px; color: var(--text-gray); border-bottom: 1px solid #333; }
+        td { padding: 12px 5px; border-bottom: 1px solid #222; vertical-align: middle; }
+        tr:hover td { background: rgba(255, 170, 0, 0.05); }
+        .room-id { font-weight: bold; color: var(--uno-yellow); font-family: monospace; font-size: 1rem; }
         
-        .room-id { font-family: 'monospace'; color: var(--uno-yellow); font-weight: bold; text-transform: uppercase; }
-        .status-badge { padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 900; }
-        .status-lobby { background: rgba(85, 170, 85, 0.15); color: var(--uno-green); }
-        .status-game { background: rgba(255, 85, 85, 0.15); color: var(--uno-red); }
+        .status-badge {
+            padding: 4px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: bold;
+        }
+        .status-lobby { background: rgba(255, 170, 0, 0.1); color: var(--uno-yellow); border: 1px solid var(--uno-yellow); }
+        .status-game { background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid #e74c3c; }
 
+        /* --- Toast Messages --- */
         #toastContainer {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; gap: 10px; z-index: 9999;
         }
         .toast-msg {
-            background: rgba(0, 0, 0, 0.85); border: 2px solid var(--uno-yellow);
-            color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold;
-            font-size: 0.8rem; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            animation: slide-up-fade 4s forwards; text-align: center; white-space: nowrap;
-        }
-        @keyframes slide-up-fade {
-            0% { opacity: 0; transform: translateY(40px); }
-            10% { opacity: 1; transform: translateY(0); }
-            90% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(20px); }
+            background: #222; border: 1px solid var(--uno-yellow); color: white;
+            padding: 10px 20px; border-radius: 8px; font-size: 0.9rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); animation: fadeInOut 4s forwards;
         }
 
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-.skeleton-row {
-    height: 20px; /* تقليل الارتفاع ليناسب الصف */
-    width: 90%;
-    margin: 10px auto;
-    background: linear-gradient(90deg, #121212 25%, #222 50%, #121212 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 4px;
-}
-@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-   </style>
+        /* --- Session Recovery FAB --- */
+        #reconnectFab {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #1a1a1a; border: 2px solid var(--uno-yellow); border-radius: 30px;
+            padding: 10px 20px; cursor: pointer; color: white; display: none; z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6); font-weight: bold; font-size: 0.9rem;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+    </style>
 </head>
 <body>
 
+<div id="toastContainer"></div>
+
+<div id="reconnectFab" onclick="recoverSession()">
+    🔄 العودة للغرفة السابقة: <span id="reconnectRoomId" style="color:var(--uno-yellow)"></span>
+</div>
+
 <div class="mobile-wrapper">
-    <div class="logo-section">
-        <div class="logo-title">UNO</div>
-        <div class="logo-subtitle">ONLINE PARTY</div>
-    </div>
+    
+    <div class="header-logo">UNO! PRO</div>
 
-    <div class="panel">
-        <div class="panel-title"><span>🃏</span> دخول سريع</div>
+    <div class="section-card">
+        <div class="section-title">الانضمام إلى غرفة</div>
         <div class="input-group">
-            <button class="btn" style="background:#222; padding:10px;" onclick="pasteCode()">📋</button>
-            <input type="text" id="joinIdInput" class="main-input" placeholder="رمز الغرفة">
-            <button class="btn btn-action" onclick="joinRoom()">دخول</button>
+            <input type="text" id="joinIdInput" class="input-text" placeholder="رمز الغرفة (مثال: A1B2C3)" maxlength="15">
+            <button id="pasteBtn" class="icon-btn" title="لصق">📋</button>
         </div>
+        <button class="btn-action" onclick="joinRoom()">انضمام</button>
     </div>
 
-    <div class="panel">
-        <div class="panel-title"><span>🎮</span> إنشاء جلسة جديدة</div>
-        <div class="radio-container">
-            <div class="radio-item">
-                <input type="radio" name="roomType" id="publicType" value="public" checked>
-                <label for="publicType" class="radio-label">عامة<span>تظهر للجميع</span></label>
-            </div>
-            <div class="radio-item">
-                <input type="radio" name="roomType" id="privateType" value="private">
-                <label for="privateType" class="radio-label">خاصة<span>دعوة فقط</span></label>
-            </div>
+    <div class="section-card">
+        <div class="section-title">إنشاء غرفة جديدة</div>
+        <div class="radio-group">
+            <label class="radio-label">
+                <input type="radio" name="roomType" value="public" checked> عامة
+            </label>
+            <label class="radio-label">
+                <input type="radio" name="roomType" value="private"> خاصة
+            </label>
         </div>
-        <button class="btn btn-outline" onclick="createRoom()">إنشاء غرفة</button>
+        <button class="btn-outline" onclick="createRoom()">إنشاء غرفة</button>
     </div>
 
-    <div class="panel" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-        <div class="panel-title"><span>🌐</span> غرف نشطة حالياً</div>
-        <div class="rooms-container">
-            <table class="rooms-table">
-                <thead>
-                    <tr>
-                        <th>الرمز</th>
-                        <th>لاعبين</th>
-                        <th>نظام الفوز</th>
-                        <th>الحالة</th>
-                    </tr>
-                </thead>
-                <tbody id="roomsListBody"></tbody>
-            </table>
-        </div>
+    <div class="section-card" style="padding: 10px; flex: 1;">
+        <div class="section-title" style="padding: 10px;">الجلسات المفتوحة مؤخراً</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>الرمز</th>
+                    <th>اللاعبين</th>
+                    <th>النظام</th>
+                    <th>الحالة</th>
+                </tr>
+            </thead>
+            <tbody id="roomsListBody">
+                <tr><td colspan="4" style="text-align:center; padding:20px; color:#888;">جاري جلب الغرف...</td></tr>
+            </tbody>
+        </table>
     </div>
-    <div id="toastContainer"></div>
+
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-    import { 
-        getDatabase, ref, onValue, get, child, set, 
-        query, orderByChild, limitToLast 
-    } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+    import { getDatabase, ref, onValue, get, child, set, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
-    // --- إعدادات Firebase ---
     const firebaseConfig = {
         apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
         authDomain: "uno-4ed20.firebaseapp.com",
@@ -184,11 +182,8 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-
-    // --- العناصر ---
     const joinInput = document.getElementById('joinIdInput');
     const joinBtn = document.querySelector('.btn-action');
-    const roomsListBody = document.getElementById('roomsListBody');
 
     window.showToast = function(msg) {
         const container = document.getElementById('toastContainer');
@@ -200,230 +195,123 @@
         setTimeout(() => toast.remove(), 4000);
     };
 
-    // --- 1. فكرة استعادة الجلسة (Session Recovery) ---
-    window.addEventListener('load', () => {
-        const lastRoom = localStorage.getItem('activeRoom');
-        const lastTime = localStorage.getItem('lastActiveTime');
-        
-        // إذا مر أقل من 10 دقائق على آخر نشاط
-        if (lastRoom && lastTime && (Date.now() - lastTime < 600000)) {
-            showRecoveryBtn(lastRoom);
-        }
-    });
-    function showRecoveryBtn(roomId) {
-        const btn = document.createElement('div');
-        btn.innerHTML = `🏁 العودة للجلسة السابقة (${roomId})`;
-        btn.style = `
-            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
-            background: var(--uno-green); color: white; padding: 12px 25px;
-            border-radius: 50px; font-weight: bold; cursor: pointer; z-index: 1000;
-            box-shadow: 0 5px 15px rgba(0,255,0,0.3); animation: slideUp 0.5s ease;
-        `;
-        btn.onclick = () => location.href = `lobby.html?r=${roomId}`;
-        document.body.appendChild(btn);
+    // --- 1. Session Recovery ---
+    const savedRoom = localStorage.getItem('uno_active_room');
+    if (savedRoom) {
+        document.getElementById('reconnectRoomId').innerText = savedRoom;
+        document.getElementById('reconnectFab').style.display = 'block';
     }
-    // --- 2. فكرة معالج اللصق الذكي ---
-    window.pasteCode = async () => {
+    window.recoverSession = () => {
+        if(savedRoom) location.href = `lobby.html?r=${savedRoom}`;
+    };
+
+    // --- 2. Smart Paste ---
+    document.getElementById('pasteBtn').addEventListener('click', async () => {
         try {
             const text = await navigator.clipboard.readText();
-            // تنظيف النص (استخراج 6 رموز فقط وتحويلها لكبيرة)
-            let cleanCode = text.trim().toUpperCase();
-            if (cleanCode.includes('?R=')) {
-                cleanCode = new URLSearchParams(cleanCode.split('?')[1]).get('r') || cleanCode;
+            if (text) {
+                let value = text.trim().toUpperCase();
+                if (value.includes('?R=')) { 
+                    try {
+                        const urlParams = new URLSearchParams(value.split('?')[1]);
+                        value = (urlParams.get('R') || urlParams.get('r') || "").toUpperCase();
+                    } catch (e) {}
+                }
+                joinInput.value = value;
+                showToast("✅ تم اللصق بنجاح");
             }
-            joinInput.value = cleanCode.substring(0, 8);
-            showToast("📋 تم اللصق بنجاح");
         } catch (err) {
-            showToast("⚠️ لا يمكن الوصول للحافظة");
+            showToast("⚠️ يرجى إعطاء صلاحية الوصول للحافظة أو قم باللصق يدوياً");
         }
-    };
-    // --- 3. تحسين الأداء + النبض (Query & Heartbeat) ---
-    // جلب آخر 20 غرفة فقط تم تحديثها
-    // دالة لعرض تأثير التحميل (Skeleton)
-function showSkeleton() {
-    const tbody = document.getElementById('roomsListBody');
-    tbody.innerHTML = ''; // مسح المحتوى الحالي
-    for (let i = 0; i < 3; i++) { // عرض 3 صفوف وهمية
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td colspan="4">
-                <div class="skeleton-row"></div>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    }
-}
-
-// استدعاء الدالة فوراً عند تشغيل الصفحة
-showSkeleton();
-    const roomsQuery = query(
-        ref(db, 'rooms'), 
-        orderByChild('lastHeartbeat'), 
-        limitToLast(20)
-    );
-
-onValue(roomsRef, (snapshot) => {
-    const rooms = snapshot.val();
-    const tbody = document.getElementById('roomsListBody');
-    
-    // بمجرد وصول أي استجابة (حتى لو فارغة) نمسح الـ Skeleton
-    tbody.innerHTML = ''; 
-
-    if (!rooms) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:40px; color:#444;">لا توجد جلسات مفتوحة</td></tr>';
-        return;
-    }
-
-        // تحويل الكائن لمصفوفة وترتيبها (الأحدث أولاً)
-        const sortedRooms = Object.entries(rooms).reverse();
-
-        sortedRooms.forEach(([id, room]) => {
-            // أ) فلترة الخصوصية
-            if (room.settings?.visibility === 'private') return;
-
-            // ب) فلترة الغرف الميتة (النبض - Heartbeat)
-            // إذا لم يتم تحديث الغرفة خلال آخر 2 دقيقة، نعتبرها ميتة
-            const isDead = (Date.now() - (room.lastHeartbeat || 0)) > 120000;
-            if (isDead) return;
-
-            const playersCount = room.players ? Object.keys(room.players).length : 0;
-            if (playersCount === 0) return;
-
-            renderRoomRow(id, room, playersCount);
-        });
     });
-    function renderRoomRow(id, room, count) {
-        const isPoints = room.settings?.points === true;
-        const inGame = room.status === 'started';
-        
-        const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        tr.onclick = () => location.href = `lobby.html?r=${id}`;
-        tr.innerHTML = `
-            <td class="room-id">${id}</td>
-            <td>👤 ${count}/10</td>
-            <td style="font-size:0.75rem; color:#888;">${isPoints ? 'نقاط' : 'تتابعي'}</td>
-            <td>
-                <span class="status-badge ${inGame ? 'status-game' : 'status-lobby'}">
-                    ${inGame ? '🎮' : '⏳'}
-                </span>
-            </td>
-        `;
-        roomsListBody.appendChild(tr);
-    }
 
-    // تحليل الروابط + تحويل الرمز لكبير
     joinInput.addEventListener('input', (e) => {
         let value = e.target.value.trim().toUpperCase();
-        if (value.includes('?R=')) { // التحقق من الرابط حتى لو كان بالكبير
+        if (value.includes('?R=')) { 
             try {
                 const urlParams = new URLSearchParams(value.split('?')[1]);
                 const roomCode = urlParams.get('R') || urlParams.get('r');
                 if (roomCode) value = roomCode.toUpperCase();
-            } catch (err) { console.error("خطأ في تحليل الرابط"); }
+            } catch (err) {}
         }
         e.target.value = value;
     });
 
-    // الانضمام لغرفة (مع التحقق من الوجود)
     window.joinRoom = async () => {
         const val = joinInput.value.trim().toUpperCase();
-        if (!val) {
-            showToast("⚠️ يرجى إدخال رمز الغرفة أولاً");
-            return;
-        }
+        if (!val) { showToast("⚠️ يرجى إدخال رمز الغرفة أولاً"); return; }
 
         joinBtn.disabled = true;
         const originalText = joinBtn.innerText;
-        joinBtn.innerText = "...";
+        joinBtn.innerText = "جاري الاتصال...";
 
         try {
-            const dbRef = ref(db);
-            const snapshot = await get(child(dbRef, `rooms/${val}`));
-
+            const snapshot = await get(child(ref(db), `rooms/${val}`));
             if (snapshot.exists()) {
                 location.href = `lobby.html?r=${val}`;
             } else {
-                showToast("⚠️ عذراً، رمز الغرفة هذا غير موجود. تأكد من الرمز أو قم بإنشاء غرفة جديدة.");
-                joinBtn.disabled = false;
-                joinBtn.innerText = originalText;
+                showToast("⚠️ عذراً، رمز الغرفة غير موجود. تأكد من الرمز.");
+                joinBtn.disabled = false; joinBtn.innerText = originalText;
             }
         } catch (error) {
             showToast("❌ حدث خطأ في الاتصال");
-            joinBtn.disabled = false;
-            joinBtn.innerText = originalText;
+            joinBtn.disabled = false; joinBtn.innerText = originalText;
         }
     };
 
-    // إنشاء غرفة (مع فحص التكرار + دعم الخصوصية)
     window.createRoom = async () => {
-    const createBtn = document.querySelector('.btn-outline');
-    const dbRef = ref(db);
-    let newId = "";
-    let isUnique = false;
+        const dbRef = ref(db);
+        let newId = "";
+        let isUnique = false;
 
-    try {
-        // 1. استخراج القيم من الواجهة أولاً
-        const roomTypeInput = document.querySelector('input[name="roomType"]:checked');
-        if (!roomTypeInput) {
-            showToast("⚠️ يرجى اختيار نوع الغرفة");
-            return;
-        }
-        const selectedType = roomTypeInput.value;
-
-        // 2. تحديث واجهة الزر
+        const createBtn = document.querySelector('.btn-outline');
         createBtn.innerText = "جاري الحجز...";
         createBtn.disabled = true;
 
-        // 3. توليد المعرف الفريد
         while (!isUnique) {
             newId = Math.random().toString(36).substring(2, 8).toUpperCase();
             const snapshot = await get(child(dbRef, `rooms/${newId}`));
             if (!snapshot.exists()) isUnique = true;
         }
 
-        const now = Date.now();
+        const selectedType = document.querySelector('input[name="roomType"]:checked').value;
 
-        // 4. حفظ البيانات كاملة في عملية واحدة (أسرع وأفضل)
-        await set(ref(db, `rooms/${newId}`), {
-            settings: { 
-                visibility: selectedType, 
-                points: false 
-            },
-            lastHeartbeat: now,
-            status: 'lobby',
-            createdAt: now
-        });
+        try {
+            await set(ref(db, `rooms/${newId}/settings`), {
+                visibility: selectedType,
+                points: false,
+                createdAt: Date.now() 
+            });
+            location.href = `lobby.html?r=${newId}&type=${selectedType}`;
+        } catch (e) {
+            showToast("❌ فشل إنشاء الغرفة");
+            createBtn.disabled = false; createBtn.innerText = "إنشاء غرفة";
+        }
+    };
 
-        // 5. الانتقال لصفحة اللوبي
-        location.href = `lobby.html?r=${newId}&type=${selectedType}`;
-
-    } catch (e) {
-        console.error(e);
-        showToast("❌ فشل إنشاء الغرفة");
-        createBtn.disabled = false;
-        createBtn.innerText = "إنشاء غرفة";
-    }
-};
-    // عرض الغرف العامة فقط
-    const roomsRef = ref(db, 'rooms');
-    onValue(roomsRef, (snapshot) => {
+    // --- 3. Shallow Query for Room List ---
+    const roomsQuery = query(ref(db, 'rooms'), orderByChild('settings/createdAt'), limitToLast(20));
+    
+    onValue(roomsQuery, (snapshot) => {
         const rooms = snapshot.val();
         const tbody = document.getElementById('roomsListBody');
-        tbody.innerHTML = '';
+        tbody.innerHTML = ''; 
 
         if (!rooms) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:40px; color:#444;">لا توجد جلسات مفتوحة</td></tr>';
             return;
         }
 
-        Object.entries(rooms).forEach(([id, room]) => {
-            // الشرط الأساسي: لا تظهر إذا كانت الخصوصية private
+        const roomsArray = Object.entries(rooms).reverse();
+        let hasVisibleRooms = false;
+
+        roomsArray.forEach(([id, room]) => {
             if (room.settings?.visibility === 'private') return;
 
             const playersCount = room.players ? Object.keys(room.players).length : 0;
             if (playersCount === 0) return;
 
+            hasVisibleRooms = true;
             const isPointsMode = room.settings?.points === true;
             const gameSystem = isPointsMode ? 'نقاط 🏆' : 'تتابعي 🏁';
             const inGame = room.status === 'started';
@@ -444,10 +332,11 @@ onValue(roomsRef, (snapshot) => {
             tbody.appendChild(tr);
         });
 
-        if (tbody.innerHTML === '') {
+        if (!hasVisibleRooms) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:40px; color:#444;">لا توجد غرف عامة حالياً</td></tr>';
         }
     });
 </script>
+
 </body>
 </html>

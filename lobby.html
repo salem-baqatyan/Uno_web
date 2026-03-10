@@ -10,10 +10,59 @@
         /* <!-- CSS Section --> */
 
         /* --- Global & Root --- */
-        :root {
-            --bg-dark: #000000; --panel-bg: #1a1a1a; --blue-team: #3498db; --red-team: #e74c3c;
-            --green-action: #4caf50; --text-gray: #aaaaaa; --modal-bg: #2a2a2a; --mobile-max-width: 450px;
-        }
+:root {
+    --bg-dark: #050505; 
+    --panel-bg: #121212; 
+    /* التدرج البرتقالي الذي أعجبك */
+    --orange-gradient: linear-gradient(135deg, #ffaa00 0%, #ff5500 100%);
+    --uno-yellow: #ffaa00;
+    --text-gray: #888888;
+    --modal-bg: #121212;
+    --mobile-max-width: 450px;
+    /* لون النجاح/الأكشن الآن برتقالي بدلاً من الأخضر */
+    --action-color: #ffaa00; 
+}
+/* زر الحفظ والانضمام وزر البدء */
+.save-btn, .start-btn {
+    background: var(--orange-gradient) !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(255, 170, 0, 0.2) !important;
+    color: white !important;
+}
+
+/* مفتاح التبديل (Switch) عند التفعيل */
+input:checked + .slider {
+    background-color: var(--uno-yellow) !important;
+}
+
+/* أيقونة المعلومات والمؤقت النشط */
+.info-icon, .active-label {
+    background: var(--uno-yellow) !important;
+    color: #000 !important;
+}
+
+/* لمسة جمالية لإطارات الصور المختارة */
+.avatar-option.selected {
+    border: 3px solid var(--uno-yellow) !important;
+}
+
+/* شريط التحميل (Spinner) */
+.spinner {
+    border-left-color: var(--uno-yellow) !important;
+}
+.icon-circle {
+    border: 0.5px solid rgba(255, 170, 0, 0.5) !important;
+    color: var(--uno-yellow) !important;
+}
+
+.btn-pill {
+    border: 1px solid #333 !important;
+}
+
+#lobbyDisplayTimer {
+    color: var(--uno-yellow);
+    text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+}
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { 
             margin: 0; background-color: var(--bg-dark); color: white; 
@@ -253,7 +302,17 @@
         .log-avatar { width: 30px; height: 30px; border-radius: 50%; border: 2px solid; }
         .log-text-clue { font-weight: bold; color: black; background: white; border-radius: 3px; padding: 1px 4px; width: 100%; text-align: center; font-size: 1rem; }
         .log-num-circle { width: 30px; height: 30px; background: white; border-radius: 50%; color: black; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; flex-shrink: 0; }
-    </style>
+ /* مظهر الصندوق عندما يكون معطلاً */
+.setting-box[style*="pointer-events: none"] {
+    filter: grayscale(1); /* تحويله للأبيض والأسود */
+    cursor: not-allowed;
+}
+
+/* مظهر السلايدر عندما يكون معطلاً */
+input:disabled + .slider {
+    background-color: #222 !important; /* لون داكن جداً */
+}
+ </style>
 </head>
 
 <body>
@@ -297,79 +356,7 @@
         <div class="settings-panel">
             <div class="panel-label">إعدادات اللعبة (للآدمن فقط)</div>
             
-            <div class="settings-grid-row">
-                <div class="setting-box">
-                    <div class="info-icon">!</div>
-                    <div class="tooltip-text">تحديد عدد اللاعبين المشاركين في الجلسة (2 إلى 10).</div>
-                    <div class="setting-box-title">عدد اللاعبين</div>
-                    <div class="counter-group">
-                        <button class="counter-btn" id="btn-players-inc" onclick="changeSetting('players', 1)">+</button>
-                        <span class="counter-val" id="val-players">2</span>
-                        <button class="counter-btn" id="btn-players-dec" onclick="changeSetting('players', -1)" disabled>-</button>
-                    </div>
-                </div>
-                
-                <div class="setting-box">
-                    <div class="info-icon">!</div>
-                    <div class="tooltip-text">عدد حزم الأونو المدمجة في اللعبة. زدها إذا كثر اللاعبون.</div>
-                    <div class="setting-box-title">عدد الحزم</div>
-                    <div class="counter-group">
-                        <button class="counter-btn" id="btn-decks-inc" onclick="changeSetting('decks', 1)">+</button>
-                        <span class="counter-val" id="val-decks">1</span>
-                        <button class="counter-btn" id="btn-decks-dec" onclick="changeSetting('decks', -1)" disabled>-</button>
-                    </div>
-                </div>
-
-                <div class="setting-box">
-                    <div class="info-icon">!</div>
-                    <div class="tooltip-text">عدد البطاقات التي تسلم لكل لاعب في بداية الجولة.</div>
-                    <div class="setting-box-title">بطاقات البدء</div>
-                    <div class="counter-group">
-                        <button class="counter-btn" id="btn-cards-inc" onclick="changeSetting('cards', 1)">+</button>
-                        <span class="counter-val" id="val-cards">7</span>
-                        <button class="counter-btn" id="btn-cards-dec" onclick="changeSetting('cards', -1)">-</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="settings-grid-row">
-                <div class="setting-box">
-                    <div class="info-icon">!</div>
-                    <div class="tooltip-text">تفعيله يسمح بتراكم بطاقات السحب ونقلها للتالي. إيقافه يجبر اللاعب على السحب وتخطي دوره.</div>
-                    <div class="setting-box-title">تراكم السحب</div>
-                    <div class="switch-container">
-                        <label class="switch">
-                            <input type="checkbox" id="toggle-stacking" checked onchange="toggleSetting('stacking', this.checked)">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="setting-box">
-                    <div class="info-icon">!</div>
-                    <div class="tooltip-text">يتغير هدف اللعبة: أول من ينهي أوراقه يحدد ترتيب البقية حسب النقاط.</div>
-                    <div class="setting-box-title">نظام النقاط</div>
-                    <div class="switch-container">
-                        <label class="switch">
-                            <input type="checkbox" id="toggle-points" onchange="toggleSetting('points', this.checked)">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="setting-box">
-                    <div class="info-icon">!</div>
-                    <div class="tooltip-text">تفعيل بطاقة بيضاء تمحو السحب المتراكم عليك، لكن لا تفيد في شيء آخر.</div>
-                    <div class="setting-box-title">بطاقة الماسح</div>
-                    <div class="switch-container">
-                        <label class="switch">
-                            <input type="checkbox" id="toggle-eraser" onchange="toggleSetting('eraser', this.checked)">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
+                <div id="settings-container"></div>
             <div class="setting-row" onclick="openTimerModal()">
                 <span id="mainTimerIcon" style="font-size:1.1rem; margin-left: 5px;">🚫</span>
                 <div style="margin-right:5px; flex: 1;">
@@ -447,6 +434,78 @@
 
 <!-- JS Section -->
 <script type="module">
+    const settingsData = [
+    { id: 'players', title: 'عدد اللاعبين', hint: 'تحديد عدد اللاعبين المشاركين في الجلسة (2 إلى 10).', val: 2, type: 'counter' },
+    { id: 'decks', title: 'عدد الحزم', hint: 'عدد حزم الأونو المدمجة في اللعبة. زدها إذا كثر اللاعبون.', val: 1, type: 'counter' },
+    { id: 'cards', title: 'بطاقات البدء', hint: 'عدد البطاقات التي تسلم لكل لاعب في بداية الجولة.', val: 7, type: 'counter' },
+    { id: 'stacking', title: 'تراكم السحب', hint: 'تفعيله يسمح بتراكم بطاقات السحب ونقلها للتالي.', type: 'toggle', checked: true },
+    { id: 'points', title: 'نظام النقاط', hint: 'يتغير هدف اللعبة: أول من ينهي أوراقه يحدد ترتيب البقية.', type: 'toggle', checked: false },
+    { id: 'eraser', title: 'بطاقة الماسح', hint: 'تفعيل بطاقة بيضاء تمحو السحب المتراكم عليك.', type: 'toggle', checked: false }
+];
+
+const container = document.getElementById('settings-container');
+
+if (container) {
+    // إضافة تباعد عمودي بين الصفوف (Rows) بمقدار 20px
+    container.style.display = "flex";
+    container.style.flexDirection = "column";
+    container.style.gap = "5px"; 
+
+    container.innerHTML = `
+        <div class="settings-grid-row">
+            ${settingsData.slice(0, 3).map(s => renderBox(s)).join('')}
+        </div>
+        <div class="settings-grid-row">
+            ${settingsData.slice(3, 6).map(s => renderBox(s)).join('')}
+        </div>
+    `;
+}
+
+function renderBox(s) {
+    const control = s.type === 'counter' 
+        ? `<div class="counter-group">
+            <button class="counter-btn" id="btn-${s.id}-inc" onclick="changeSetting('${s.id}', 1)">+</button>
+            <span class="counter-val" id="val-${s.id}">${s.val}</span>
+            <button class="counter-btn" id="btn-${s.id}-dec" onclick="changeSetting('${s.id}', -1)" ${s.val <= 1 ? 'disabled' : ''}>-</button>
+           </div>`
+        : `<div class="switch-container">
+            <label class="switch">
+                <input type="checkbox" id="toggle-${s.id}" ${s.checked ? 'checked' : ''} onchange="toggleSetting('${s.id}', this.checked)">
+                <span class="slider"></span>
+            </label>
+           </div>`;
+
+    return `<div class="setting-box">
+                <div class="info-icon">!</div>
+                <div class="tooltip-text">${s.hint}</div>
+                <div class="setting-box-title">${s.title}</div>
+                ${control}
+            </div>`;
+}
+    function updateEraserStatus() {
+    const stackingToggle = document.getElementById('toggle-stacking');
+    const eraserToggle = document.getElementById('toggle-eraser');
+    const eraserBox = eraserToggle.closest('.setting-box'); // للحصول على الحاوية الأب لتغيير شكلها
+
+    if (!stackingToggle.checked) {
+        // إذا كان التراكم معطلاً
+        eraserToggle.checked = false; // إطفاء الماسح تلقائياً
+        eraserToggle.disabled = true; // منع النقر عليه
+        eraserBox.style.opacity = "0.4"; // جعل الصندوق باهتاً
+        eraserBox.style.pointerEvents = "none"; // منع أي تفاعل مع الصندوق
+    } else {
+        // إذا كان التراكم مفعلاً
+        eraserToggle.disabled = false;
+        eraserBox.style.opacity = "1";
+        eraserBox.style.pointerEvents = "auto";
+    }
+}
+
+// تأكد من استدعاء هذه الدالة عند تحميل الصفحة وأيضاً عند تغيير حالة التراكم
+document.getElementById('toggle-stacking').addEventListener('change', updateEraserStatus);
+
+// استدعاء أولي لضبط الحالة عند فتح الردهة
+updateEraserStatus();
 /* ---------- 1. Setup & Config ---------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, onDisconnect, update, runTransaction, remove, get, serverTimestamp } 
@@ -697,11 +756,16 @@ document.getElementById('roomDisplay').innerText = "🔗 " + roomId;
 function updatePlayersGrid(numberOfPlayers) {
     const grid = document.getElementById('playersGrid');
     if (!grid) return;
+    
+    // تأكد من ضبط اتجاه الـ Grid برمجياً لضمان البدء من اليسار
+    grid.style.direction = "ltr"; 
     grid.innerHTML = ''; 
 
     for (let i = 0; i < numberOfPlayers; i++) {
         const box = document.createElement('div');
         box.className = `team-box ${slotColors[i]}`;
+        // جعل محتوى الكرت داخلياً RTL ليبقى النص العربي صحيحاً
+        box.style.direction = "rtl"; 
         box.innerHTML = `
             <div class="slot-number">${i + 1}</div>
             <div class="player-slot-container" id="slot-${i}"></div>
