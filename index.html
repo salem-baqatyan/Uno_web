@@ -114,6 +114,38 @@
             90% { opacity: 1; transform: translateY(0); }
             100% { opacity: 0; transform: translateY(-20px); }
         }
+        /* --- تعديل الحاوية لمنع السكرول الكلي --- */
+.mobile-wrapper {
+    width: 100%; 
+    max-width: var(--mobile-max-width); 
+    height: 100dvh; 
+    background: #000;
+    display: flex; 
+    flex-direction: column; 
+    border-left: 1px solid #333; 
+    border-right: 1px solid #333;
+    position: relative; 
+    overflow: hidden; /* تم تغييرها من auto إلى hidden */
+    padding: 20px;
+}
+
+/* --- تعديل حاوية الجدول لتصبح قابلة للتمرير --- */
+/* ابحث عن الكارد الأخير وقم بتعديله أو أضف هذا التنسيق */
+.rooms-container {
+    flex: 1;
+    overflow-y: auto; /* تفعيل السكرول هنا فقط */
+    margin-top: 10px;
+    scrollbar-width: thin; /* لشكل سكرول أنحف في فايرفوكس */
+}
+
+/* --- تثبيت رأس الجدول --- */
+table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--panel-bg); /* نفس لون خلفية الكارد */
+    z-index: 10;
+    box-shadow: 0 2px 2px -1px rgba(0,0,0,0.4); /* ظل بسيط لفصله عن المحتوى */
+}
     </style>
 </head>
 <body>
@@ -150,21 +182,24 @@
         <button class="btn-outline" onclick="createRoom()">إنشاء غرفة</button>
     </div>
 
-    <div class="section-card" style="padding: 10px; flex: 1;">
-        <div class="section-title" style="padding: 10px;">الجلسات المفتوحة مؤخراً</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>الرمز</th>
-                    <th>اللاعبين</th>
-                    <th>النظام</th>
-                    <th>الحالة</th>
-                </tr>
-            </thead>
-            <tbody id="roomsListBody">
-                <tr><td colspan="4" style="text-align:center; padding:20px; color:#888;">جاري جلب الغرف...</td></tr>
-            </tbody>
-        </table>
+    <div class="section-card" style="padding: 10px; flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+        <div class="section-title" style="padding: 10px; margin-bottom: 0;">الجلسات المفتوحة مؤخراً</div>
+        
+        <div class="rooms-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الرمز</th>
+                        <th>اللاعبين</th>
+                        <th>النظام</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody id="roomsListBody">
+                    <tr><td colspan="4" style="text-align:center; padding:20px; color:#888;">جاري جلب الغرف...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
