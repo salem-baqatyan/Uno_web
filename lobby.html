@@ -312,6 +312,16 @@ input:checked + .slider {
 input:disabled + .slider {
     background-color: #222 !important; /* لون داكن جداً */
 }
+/* --- حالة انقطاع الاتصال --- */
+.player-offline {
+    opacity: 0.5;
+    filter: grayscale(100%);
+    transition: all 0.3s ease;
+}
+.player-offline .mini-name-tag {
+    background: #555;
+    border-color: transparent !important;
+}
  </style>
 </head>
 
@@ -548,7 +558,7 @@ const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
 const settingsRef = ref(db, `rooms/${roomId}/settings`);
 const statusRef = ref(db, `rooms/${roomId}/status`);
 const globalPlayersRef = ref(db, `global_players/${playerId}`);
-
+const connectedRef = ref(db, ".info/connected");
 
 /* ---------- 2. State & Assets ---------- */
 let myData = {
@@ -591,6 +601,19 @@ const slotColors = ['slot-0', 'slot-1', 'slot-2', 'slot-3', 'slot-4', 'slot-5', 
 
 
 /* ---------- 3. Profile Management ---------- */
+function setupPresence() {
+    onValue(connectedRef, (snap) => {
+        if (snap.val() === true) {
+            // بمجرد الاتصال، نخبر السيرفر بما يجب فعله عند الانقطاع
+            onDisconnect(myPlayerRef).update({
+                isOffline: true,
+                lastActive: serverTimestamp()
+            });
+            // نؤكد أننا متصلون الآن
+            update(myPlayerRef, { isOffline: false, lastActive: serverTimestamp() });
+        }
+    });
+}
 async function renderAvatars() {
     const container = document.getElementById('avatarContainer');
     if (!container) return;
@@ -637,6 +660,7 @@ async function autoJoinRoom() {
     
     await update(myPlayerRef, { ...myData, lastActive: now, joinedAt: now });
     startHeartbeat();
+    setupPresence();
 }
 
 window.saveProfile = async () => {
@@ -671,6 +695,7 @@ window.saveProfile = async () => {
     
     await update(myPlayerRef, { ...myData, lastActive: now,});
     startHeartbeat();
+    setupPresence();
 };
 
 window.openProfileSettings = () => {
@@ -827,14 +852,15 @@ function renderLobby(players, adminId, currentSettings) {
         const isMe = p.id === playerId;
         const isPlayerAdmin = p.id === adminId;
         
+        const isOfflineClass = p.isOffline ? 'player-offline' : '';
         const playerHtml = `
-            <div class="player-card-mini ${p.slot === 'spectators' ? 'player-spec' : ''} ${isMe ? 'is-me-mini' : ''}" style="border:none; background:transparent;">
+            <div class="player-card-mini ${p.slot === 'spectators' ? 'player-spec' : ''} ${isMe ? 'is-me-mini' : ''} ${isOfflineClass}" style="border:none; background:transparent;">
                 <div class="player-avatar-mini-wrap ${isPlayerAdmin ? 'is-admin-mini' : ''}">
                     <div class="avatar-frame">
                         <img src="${p.avatar}" class="mini-img">
                     </div>
                 </div>
-                <div class="mini-name-tag">${p.name}</div>
+                <div class="mini-name-tag">${p.name} ${p.isOffline ? '(مفقود)' : ''}</div>
             </div>
         `;
 
@@ -1021,10 +1047,12 @@ onValue(playersRef, (snapshot) => {
     const playerList = Object.values(players);
     document.getElementById('playerCount').innerText = playerList.length;
     
-    const sorted = playerList.sort((a, b) => a.joinedAt - b.joinedAt);
-    const adminId = sorted[0].id;
+    // تحديد الآدمن: نأخذ أقدم لاعب متصل فقط (نستثني المنقطعين)
+    const onlinePlayers = playerList.filter(p => !p.isOffline).sort((a, b) => a.joinedAt - b.joinedAt);
+    
+    // إذا لم يكن هناك أحد متصل، لا يوجد آدمن
+    const adminId = onlinePlayers.length > 0 ? onlinePlayers[0].id : null;
     isAdmin = (playerId === adminId);
-
     document.getElementById('startBtn').style.display = isAdmin ? 'block' : 'none';
     
     const settingsPanel = document.querySelector('.settings-panel');
