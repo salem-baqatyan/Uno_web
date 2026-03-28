@@ -341,8 +341,10 @@ table thead th {
         let hasVisibleRooms = false;
 
         roomsArray.forEach(([id, room]) => {
-            if (room.settings?.visibility === 'private') return;
+            const isPublic = room.settings && room.settings.visibility === 'public';
+            if (!isPublic) return;
 
+            // 2. التحقق من وجود لاعبين (تجنب الغرف المهجورة)
             const playersCount = room.players ? Object.keys(room.players).length : 0;
             if (playersCount === 0) return;
 
