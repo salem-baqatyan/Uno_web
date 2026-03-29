@@ -479,53 +479,79 @@ async function handlePlayCard(cardStr, cardIndex) {
 }
 
 async function executeMove(cardStr, cardIndex, chosenColor) {
+    const card = parseCard(cardStr);
+    
+    // --- القاعدة الجديدة: منع الفوز ببطاقة أكشن ---
+    const isActionCard = card.value === "⊘" || // تخطي
+                         card.value === "↻" || // عكس
+                         card.value === "+2" || // سحب 2
+                         card.value === "+4" || // سحب 4
+                         card.type === "wildColor" || // تغيير لون
+                         card.isEraser; // الماسح
+
+    if (myHand.length === 1 && isActionCard) {
+        return showToast("🚫 لا يمكنك إنهاء اللعبة ببطاقة أكشن! يجب أن تكون بطاقتك الأخيرة رقماً.");
+    }
+    // ------------------------------------------
+
     let nextDirection = gameState.turnState.direction;
     let skipNext = false;
     let addedStack = 0;
-    const card = parseCard(cardStr);
     const isStackingEnabled = roomSettings.stacking !== false;
 
-    // منطق الماسح: يصفر التراكم تماماً
+    // 1. تحديد عدد اللاعبين الذين لم ينتهوا بعد
+    const playersStillPlaying = activePlayersList.filter(p => !p.finishedRank).length;
+
     let newDrawStack = (gameState.turnState.drawStack || 0);
+    
     if (card.isEraser) {
         newDrawStack = 0; 
     } else {
         if (card.value === "↻") {
-            nextDirection *= -1;
-            if (activePlayersList.length === 2) skipNext = true;
+            if (playersStillPlaying === 2) {
+                skipNext = true;
+            } else {
+                nextDirection *= -1;
+                if (activePlayersList.length === 2) skipNext = true; 
+            }
         } else if (card.value === "⊘") {
             skipNext = true;
-        } else if (card.value === "+2") addedStack = 2;
-        else if (card.value === "+4") addedStack = 4;
+        } else if (card.value === "+2") {
+            addedStack = 2;
+            if (playersStillPlaying === 2) skipNext = true;
+        } else if (card.value === "+4") {
+            addedStack = 4;
+            if (playersStillPlaying === 2) skipNext = true;
+        }
         newDrawStack += addedStack;
     }
 
+    // تحديد اللاعب القادم
     let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
     
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
     
+    // تنفيذ اللعب
     myHand.splice(cardIndex, 1);
-    // --- منطق الفحص للأنظمة ---
-const isPointsMode = roomSettings.points === true;    let isGameOver = false;
+    
+    const isPointsMode = roomSettings.points === true;
+    let isGameOver = false;
     let myRank = null;
 
+    // الفوز مسموح فقط الآن لأننا تأكدنا أنها ليست بطاقة أكشن
     if (myHand.length === 0) {
         if (isPointsMode) {
-            // نظام النقاط: أول شخص ينهي، تتجمد اللعبة فوراً
             isGameOver = true;
         } else {
-            // النظام التتابعي: تسجيل ترتيب اللاعب
             const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
             myRank = currentFinishedCount + 1;
-            
-            // إذا بقي لاعب واحد فقط بأوراق، تنتهي اللعبة
             if (activePlayersList.length - myRank <= 1) {
                 isGameOver = true;
             }
         }
     }
-    // -------------------------
+
     discardPile.push(cardStr);
 
     const updates = {};
@@ -534,11 +560,9 @@ const isPointsMode = roomSettings.points === true;    let isGameOver = false;
 
     if (myRank) updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
 
-    // معالجة السحب المباشر إذا كان التراكم مغلقاً
+    // معالجة السحب المباشر
     if (addedStack > 0 && !isStackingEnabled) {
-        nextPlayerId = getNextPlayerId(true, nextDirection); // تخطي اللاعب المنسحب عليه
-        const targetPlayerId = getNextPlayerId(false, nextDirection); // اللاعب المستهدف للسحب
-
+        const targetPlayerId = getNextPlayerId(false, nextDirection); 
         const drawRes = extractCardsToDraw(newDrawStack, deck, discardPile);
         deck = drawRes.deck;
         discardPile = drawRes.discard;
@@ -546,23 +570,29 @@ const isPointsMode = roomSettings.points === true;    let isGameOver = false;
         let targetHand = (playersData[targetPlayerId].hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetPlayerId}/hand`] = targetHand;
         updates[`rooms/${roomId}/players/${targetPlayerId}/handCount`] = targetHand.length;
-        
-        // --- السطر الجديد هنا ---
         updates[`rooms/${roomId}/players/${targetPlayerId}/saidUno`] = false; 
         
-        newDrawStack = 0; // تصفير التراكم لأنه نُفذ فوراً
+        newDrawStack = 0;
+        
+        if (playersStillPlaying === 2) {
+            nextPlayerId = playerId; 
+        } else {
+            nextPlayerId = getNextPlayerId(true, nextDirection);
+        }
     }
 
     updates[`rooms/${roomId}/game/deck`] = deck;
     updates[`rooms/${roomId}/game/discardPile`] = discardPile;
 
-    // إذا انتهت اللعبة، نغير الحالة فقط ولا نحدث الدور
     if (isGameOver) {
         updates[`rooms/${roomId}/game/status`] = 'finished';
     } else {
         updates[`rooms/${roomId}/game/turnState`] = {
-            currentTurnId: nextPlayerId, direction: nextDirection, selectedColor: chosenColor,
-            drawStack: newDrawStack, lastUpdated: serverTimestamp()
+            currentTurnId: nextPlayerId, 
+            direction: nextDirection, 
+            selectedColor: chosenColor,
+            drawStack: newDrawStack, 
+            lastUpdated: serverTimestamp()
         };
     }
 
@@ -664,43 +694,96 @@ onValue(ref(db, `rooms/${roomId}/game/toastMessage`), (snap) => {
 });
 
 // برمجة زر UNO
+// برمجة زر UNO المحدثة
 document.querySelector('.uno-btn').onclick = async () => {
-    if (myHand.length === 2) {
-        // إذا كان لديه بطاقتين، يوثق أنه قالها
-        await update(ref(db, `rooms/${roomId}/players/${playerId}`), { saidUno: true });
-        // إرسال إشعار للجميع
-        await update(ref(db, `rooms/${roomId}/game/toastMessage`), { 
-            msg: `🗣️ ${playersData[playerId].name} قال UNO!`, 
-            time: Date.now() 
-        });
-    } else {
-        // إذا كان لديه أكثر من بطاقتين أو بطاقة واحدة (تنبيه محلي له فقط)
-        showToast("يمكنك الضغط على زر UNO فقط عندما يتبقى لك بطاقتين!");
+    // 1. التأكد أن الدور دوري
+    if (gameState.turnState.currentTurnId !== playerId) {
+        return showToast("لا يمكنك قول UNO إلا عندما يكون الدور لك!");
     }
+
+    // 2. التأكد من عدد البطاقات (يجب أن يكون 2 لكي تصبح 1 بعد اللعب)
+    if (myHand.length !== 2) {
+        return showToast("تضغط UNO فقط عندما يتبقى معك بطاقتين وستلعب إحداهما!");
+    }
+
+    // 3. التأكد أنه لم يضغط الزر مسبقاً في هذا الدور
+    if (playersData[playerId].saidUno === true) {
+        return showToast("لقد أعلنت UNO بالفعل لهذا الدور!");
+    }
+
+    // تنفيذ العملية
+    await update(ref(db, `rooms/${roomId}/players/${playerId}`), { saidUno: true });
+    await update(ref(db, `rooms/${roomId}/game/toastMessage`), { 
+        msg: `🗣️ ${playersData[playerId].name} قال UNO!`, 
+        time: Date.now() 
+    });
 };
 window.layoutPlayers = function(playersData, myId, currentTurnId) {
     const container = document.getElementById('playersContainer');
     container.innerHTML = '';
-    const playersArray = Object.values(playersData).filter(p => p.slot?.startsWith('slot-'));
-    const configs = { 1:{r:0,t:0,l:0}, 2:{r:1,t:0,l:1}, 3:{r:1,t:1,l:1}, 4:{r:2,t:0,l:2}, 5:{r:2,t:1,l:2}, 6:{r:2,t:2,l:2}, 7:{r:2,t:3,l:2}, 8:{r:3,t:2,l:3}, 9:{r:3,t:3,l:3}, 10:{r:4,t:2,l:4} };
-    const config = configs[playersArray.length] || configs[7];
-    let positions = [];
-    for(let i=config.l-1; i>=0; i--) positions.push({s:'left', t:(100/(config.l+1))*(i+1)});
-    for(let i=0; i<config.t; i++) positions.push({s:'top', l:(100/(config.t+1))*(i+1)});
-    for(let i=0; i<config.r; i++) positions.push({s:'right', t:(100/(config.r+1))*(i+1)});
+    
+    // 1. جلب اللاعبين وترتيبهم حسب السلوت (الترتيب البرمجي الثابت)
+    const playersArray = Object.values(playersData)
+        .filter(p => p.slot?.startsWith('slot-'))
+        .sort((a, b) => parseInt(a.slot.split('-')[1]) - parseInt(b.slot.split('-')[1]));
 
+    const count = playersArray.length;
+    
+    // 2. توزيع المقاعد بناءً على العدد (يمين، أعلى، يسار)
+    // قمت بتعديل التقسيم ليكون أكثر توازناً
+    const configs = {
+        1: { left: 0, top: 1, right: 0 },
+        2: { left: 1, top: 0, right: 1 },
+        3: { left: 1, top: 1, right: 1 },
+        4: { left: 2, top: 0, right: 2 },
+        5: { left: 2, top: 1, right: 2 },
+        6: { left: 2, top: 2, right: 2 },
+        7: { left: 2, top: 3, right: 2 },
+        8: { left: 3, top: 2, right: 3 },
+        9: { left: 3, top: 3, right: 3 },
+        10: { left: 4, top: 2, right: 4 }
+    };
+
+    const config = configs[count] || configs[7];
+    let positions = [];
+
+    // ترتيب إضافة المواقع مهم جداً ليتطابق مع ترتيب المصفوفة:
+    
+    // أ- الجانب الأيسر (من الأسفل للأعلى)
+    for (let i = 0; i < config.left; i++) {
+        positions.push({ side: 'left', top: 80 - (i * (60 / Math.max(config.left, 1))) });
+    }
+
+    // ب- الجانب العلوي (من اليسار لليمين)
+    for (let i = 0; i < config.top; i++) {
+        positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) });
+    }
+
+    // ج- الجانب الأيمن (من الأعلى للأسفل)
+    for (let i = 0; i < config.right; i++) {
+        positions.push({ side: 'right', top: 20 + (i * (60 / Math.max(config.right, 1))) });
+    }
+
+    // 3. رسم اللاعبين
     playersArray.forEach((p, i) => {
         if (!positions[i]) return;
         const pos = positions[i];
         const seat = document.createElement('div');
         
-        // التحقق مما إذا كان لديه بطاقة واحدة لتفعيل النبض الأحمر
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
-        
         const isFinished = p.finishedRank ? 'finished-player' : '';
-        seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId && !p.finishedRank ?'is-turn':''} ${isFinished}`;        seat.style.cssText = pos.s==='right'?`top:${pos.t}%;right:15px;transform:translateY(-50%);`:pos.s==='left'?`top:${pos.t}%;left:15px;transform:translateY(-50%);`:`top:20px;left:${pos.l}%;transform:translateX(-50%);`;
         
-        // أضفنا حدث onclick لتقديم الاعتراض
+        seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId && !p.finishedRank ?'is-turn':''} ${isFinished}`;
+        
+        // تطبيق التموضع
+        if (pos.side === 'left') {
+            seat.style.cssText = `top:${pos.top}%; left:15px; transform:translateY(-50%);`;
+        } else if (pos.side === 'right') {
+            seat.style.cssText = `top:${pos.top}%; right:15px; transform:translateY(-50%);`;
+        } else {
+            seat.style.cssText = `top:20px; left:${pos.left}%; transform:translateX(-50%);`;
+        }
+
         seat.innerHTML = `
             <div class="avatar-wrap" onclick="handleChallenge('${p.id}')">
                 <img src="${p.avatar}">
@@ -710,48 +793,53 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         `;
         container.appendChild(seat);
     });
-    document.getElementById('playerCount').innerText = playersArray.length;
+
+    document.getElementById('playerCount').innerText = count;
 };
 window.handleChallenge = async function(targetId) {
-    if (targetId === playerId) return; // لا يمكنك الاعتراض على نفسك
-    
-    // التحقق أن الدور دورك (إذا لم يكن دورك لن تعمل)
-    if (gameState.turnState.currentTurnId !== playerId) {
-        return showToast("يمكنك تقديم اعتراض فقط عندما يكون الدور لك للعب!");
-    }
-    
-    const targetPlayer = playersData[targetId];
-    if (targetPlayer.handCount !== 1) return; // يعترض فقط على من لديه بطاقة واحدة
+    if (targetId === playerId) return; 
 
-    // استدعاء النافذة المخصصة وانتظار قرار اللاعب
+    // 1. القيد الأول: يجب أن يكون الدور دورك لتعترض
+    if (gameState.turnState.currentTurnId !== playerId) {
+        return showToast("يمكنك تقديم اعتراض فقط عندما يكون الدور لك!");
+    }
+
+    // 2. القيد الثاني: الاعتراض فقط على من لديه بطاقة واحدة
+    const targetPlayer = playersData[targetId];
+    if (targetPlayer.handCount !== 1) {
+        return showToast("يمكنك الاعتراض فقط على اللاعب الذي يملك بطاقة واحدة!");
+    }
+
+    // 3. فتح النافذة للتأكيد
     const isSure = await openChallengeModal(targetPlayer.name);
-    if (!isSure) return; // إذا ضغط "إلغاء"، نوقف العملية
+    if (!isSure) return;
 
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
     const updates = {};
     let drawRes;
 
+    // منطق التحقق من قول UNO
     if (targetPlayer.saidUno === true) {
-        // ❌ اعتراض خاطئ: المعتَرَض عليه قال أونو، المعتَرِض (أنت) تسحب بطاقة كعقاب
+        // اعتراض خاطئ -> عقاب للمعتَرِض (بطاقة واحدة)
         drawRes = extractCardsToDraw(1, deck, discardPile);
-        myHand = myHand.concat(drawRes.drawnCards); // إضافة البطاقة ليدك
+        myHand = myHand.concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
         updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
         
         updates[`rooms/${roomId}/game/toastMessage`] = { 
-            msg: `❌ اعتراض خاطئ! ${targetPlayer.name} سبق وقال UNO. تم معاقبة ${playersData[playerId].name} ببطاقة!`, 
+            msg: `❌ اعتراض خاطئ! ${targetPlayer.name} سبق وقال UNO.`, 
             time: Date.now() 
         };
     } else {
-        // ✅ اعتراض صحيح: المعتَرَض عليه نسي، هو يسحب بطاقتين
+        // اعتراض صحيح -> عقاب للمخطئ (بطاقتين)
         drawRes = extractCardsToDraw(2, deck, discardPile);
         let targetHand = (targetPlayer.hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetId}/hand`] = targetHand;
         updates[`rooms/${roomId}/players/${targetId}/handCount`] = targetHand.length;
         
         updates[`rooms/${roomId}/game/toastMessage`] = { 
-            msg: `🚨 صاااده! ${targetPlayer.name} نسي يقول UNO وسحب بطاقتين عقاب!`, 
+            msg: `🚨 صاااده! ${targetPlayer.name} نسى يقول UNO وسحب بطاقتين!`, 
             time: Date.now() 
         };
     }
@@ -778,15 +866,26 @@ window.closeChallengeModal = function(result) {
         challengeResolver = null;
     }
 };
-// حساب نقاط اليد (لنظام النقاط)
+// حساب نقاط اليد بدقة (لنظام النقاط)
 function calculateHandPoints(hand) {
     let total = 0;
-    if (!hand) return 0;
+    if (!hand || hand.length === 0) return 0;
+    
     hand.forEach(cardStr => {
         const c = parseCard(cardStr);
-        if (c.isWild) total += 50;
-        else if (["⊘", "↻", "+2"].includes(c.value)) total += 20;
-        else if (!isNaN(parseInt(c.value))) total += parseInt(c.value);
+        
+        // 1. بطاقات الجوكر (50 نقطة)
+        if (c.isWild || c.isEraser || cardStr === "wildColor" || cardStr === "wildDrawFour" || cardStr === "Eraser") {
+            total += 50;
+        } 
+        // 2. بطاقات الأكشن (20 نقطة)
+        else if (c.value === "⊘" || c.value === "↻" || c.value === "+2") {
+            total += 20;
+        } 
+        // 3. بطاقات الأرقام (تأخذ قيمتها الرقمية)
+        else if (!isNaN(parseInt(c.value))) {
+            total += parseInt(c.value);
+        }
     });
     return total;
 }
@@ -804,53 +903,76 @@ window.showLeaderboard = function() {
     let sortedPlayers = [...activePlayersList];
     tbody.innerHTML = '';
 
+    // مصفوفة الأسماء التتابعية باللغة العربية
+    const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
+
     if (isPointsMode) {
         // --- 1. نظام النقاط ---
         systemTypeElement.innerText = "نظام الفوز: النقاط (الترتيب بالرصيد)";
-        headers.innerHTML = `<th>الرقم</th><th>اللاعب</th><th>النقاط</th>`;
+        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>النقاط</th>`;
         
-        // حساب النقاط لكل لاعب
+        // حساب النقاط لجميع اللاعبين
         sortedPlayers.forEach(p => {
             p.points = calculateHandPoints(p.hand);
         });
+
+        // الترتيب الواقعي لنظام النقاط:
+        // أ- الشخص الذي أنهى أوراقه (يده فارغة) هو الأول دائماً (0 نقاط).
+        // ب- بقية اللاعبين يتم ترتيبهم من الأقل نقاطاً إلى الأعلى نقاطاً.
+        sortedPlayers.sort((a, b) => {
+            const aCount = a.hand ? a.hand.length : 0;
+            const bCount = b.hand ? b.hand.length : 0;
+
+            // إذا أحدهما يملك 0 بطاقات، فهو الفائز الحتمي بالمركز الأول
+            if (aCount === 0) return -1;
+            if (bCount === 0) return 1;
+
+            // البقية يتم ترتيبهم حسب النقاط (الأقل نقاطاً أولاً)
+            return a.points - b.points;
+        });
         
-        // ترتيب اللاعبين من الأقل نقاطاً إلى الأعلى
-        sortedPlayers.sort((a, b) => a.points - b.points);
-        
-        // رسم الجدول
+        // رسم جدول النقاط
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
             const rowClass = isMe ? 'is-me-row' : '';
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
+            const rankText = rankNames[idx] || (idx + 1);
             
-            // المركز الأول (idx === 0) دائماً يأخذ 0 نقاط كما طلبت
-            const finalPoints = idx === 0 ? 0 : p.points;
-            
-            tbody.innerHTML += `<tr class="${rowClass}"><td>${idx + 1}</td><td>${playerName}</td><td>${finalPoints}</td></tr>`;
+            tbody.innerHTML += `<tr class="${rowClass}"><td>${rankText}</td><td>${playerName}</td><td>${p.points}</td></tr>`;
         });
 
     } else {
         // --- 2. النظام التتابعي ---
         systemTypeElement.innerText = "نظام الفوز: التتابعي (الخروج المتسلسل)";
-        headers.innerHTML = `<th>الرقم</th><th>اللاعب</th><th>الترتيب</th>`;
+        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>الحالة</th>`;
         
-        // الترتيب حسب من خرج أولاً (من لا يملك finishedRank نعتبره رقم 999 ليكون في النهاية)
-        sortedPlayers.sort((a, b) => (a.finishedRank || 999) - (b.finishedRank || 999));
+        // الترتيب الواقعي للنظام التتابعي:
+        // أ- من يملك finishedRank يرتبون تصاعدياً حسب من خرج أولاً.
+        // ب- من لم يخرجوا بعد (بقيت معهم بطاقات) يتم ترتيبهم حسب الأقل بطاقات.
+        sortedPlayers.sort((a, b) => {
+            const rankA = a.finishedRank || 999;
+            const rankB = b.finishedRank || 999;
+
+            if (rankA !== rankB) {
+                return rankA - rankB; // ترتيب الخارجين أولاً
+            } else {
+                // لو تساووا (مثلاً اللعبة قُطعت وبقي اثنان لم ينتهوا) نرتبهم حسب الأقل بطاقات
+                const countA = a.hand ? a.hand.length : 999;
+                const countB = b.hand ? b.hand.length : 999;
+                return countA - countB;
+            }
+        });
         
-        // مصفوفة الأسماء التتابعية
-        const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
-        
-        // رسم الجدول
+        // رسم جدول النظام التتابعي
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
             const rowClass = isMe ? 'is-me-row' : '';
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
             
-            // نأخذ الاسم من المصفوفة حسب رقم الاندكس الخاص به في المصفوفة المرتبة
-            // هذا يلغي تماماً كلمة "الأخير" ويضمن تسلسل دقيق (الأول، الثاني، الثالث...)
-            const rankText = rankNames[idx] || (idx + 1); 
+            const rankText = rankNames[idx] || (idx + 1);
+            const statusText = p.finishedRank ? "تم إنهاء الأوراق" : `بقي معه (${p.handCount || 0}) بطاقات`;
             
-            tbody.innerHTML += `<tr class="${rowClass}"><td>${idx + 1}</td><td>${playerName}</td><td>${rankText}</td></tr>`;
+            tbody.innerHTML += `<tr class="${rowClass}"><td>${rankText}</td><td>${playerName}</td><td>${statusText}</td></tr>`;
         });
     }
     
@@ -864,7 +986,6 @@ window.showLeaderboard = function() {
     const countdownText = document.getElementById('countdown-text');
     const totalOffset = 176;
 
-    // تصفير العداد بصرياً في حال ظهرت اللوحة مرة أخرى
     if (timerBar) timerBar.style.strokeDashoffset = 0;
     if (countdownText) countdownText.innerText = timeLeft;
 
@@ -883,7 +1004,6 @@ window.showLeaderboard = function() {
         }
     }, 1000);
 };
-
 // دالة النقل والتصفير التي تُستدعى عند انتهاء الوقت
 async function handleAutoTransition() {
     if (!playersData || !playersData[playerId]) return;

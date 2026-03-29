@@ -1047,13 +1047,31 @@ onValue(playersRef, (snapshot) => {
     const playerList = Object.values(players);
     document.getElementById('playerCount').innerText = playerList.length;
     
-    // تحديد الآدمن: نأخذ أقدم لاعب متصل فقط (نستثني المنقطعين)
     const onlinePlayers = playerList.filter(p => !p.isOffline).sort((a, b) => a.joinedAt - b.joinedAt);
-    
-    // إذا لم يكن هناك أحد متصل، لا يوجد آدمن
     const adminId = onlinePlayers.length > 0 ? onlinePlayers[0].id : null;
     isAdmin = (playerId === adminId);
-    document.getElementById('startBtn').style.display = isAdmin ? 'block' : 'none';
+    
+    const startBtn = document.getElementById('startBtn');
+    if (startBtn) {
+        startBtn.style.display = isAdmin ? 'block' : 'none';
+        
+        // حساب اللاعبين المنضمين للسلوتات حالياً
+        const slottedPlayersCount = playerList.filter(p => p.slot && p.slot.startsWith('slot-')).length;
+        const isFull = slottedPlayersCount === localSettings.players;
+
+        if (isAdmin) {
+            if (isFull) {
+                startBtn.disabled = false;
+                startBtn.style.opacity = "1";
+                startBtn.style.cursor = "pointer";
+                startBtn.innerText = "ابدأ اللعبة الآن";
+            } else {
+                startBtn.disabled = false; // نتركه مفعل تقنياً ليتمكن من رؤية الـ Toast عند الضغط
+                startBtn.style.opacity = "0.6";
+                startBtn.innerText = `في انتظار اللاعبين (${slottedPlayersCount}/${localSettings.players})`;
+            }
+        }
+    }
     
     const settingsPanel = document.querySelector('.settings-panel');
     if (settingsPanel) {
@@ -1063,7 +1081,6 @@ onValue(playersRef, (snapshot) => {
     
     renderLobby(players, adminId, localSettings);
 });
-
 
 /* ---------- 7. Game Engine & Start ---------- */
 // دالة إنشاء مصفوفة الأوراق
@@ -1115,7 +1132,7 @@ function createUnoDeck(numDecks = 1, includeEraser = false) {
 
     return deck;
 }
-window.handleStartGame = async () => {
+window.handleStartGame = async function() {
     if (!isAdmin) return;
 
     const [playersSnap, settingsSnap] = await Promise.all([
@@ -1126,6 +1143,7 @@ window.handleStartGame = async () => {
     const playersData = playersSnap.val() || {};
     const settings = settingsSnap.val() || defaultSettings;
 
+    // جلب اللاعبين المنضمين للسلوتات فقط
     let activePlayers = Object.values(playersData)
         .filter(p => p.slot.startsWith('slot-'))
         .sort((a, b) => {
@@ -1134,18 +1152,21 @@ window.handleStartGame = async () => {
             return slotA - slotB;
         });
 
-    if (activePlayers.length < 2) {
-        return showToast("⚠️ يجب أن ينضم لاعبان على الأقل للبدء");
+    // --- الشرط الجديد المحدث ---
+    const requiredPlayers = settings.players; // العدد المحدد في الإعدادات
+    if (activePlayers.length < requiredPlayers) {
+        return showToast(`⚠️ لا يمكن البدء، يجب أن يكتمل العدد (${activePlayers.length}/${requiredPlayers})`);
     }
+    // --------------------------
 
     document.getElementById('startBtn').innerText = "جاري التجهيز...";
     document.getElementById('startBtn').disabled = true;
 
-    // إنشاء وخلط
+    // 1. إنشاء وخلط الكومة
     let deck = createUnoDeck(settings.decks, settings.eraser);
     shuffleArray(deck);
 
-    // توزيع
+    // 2. توزيع البطاقات على اللاعبين
     let hands = {};
     activePlayers.forEach(p => {
         hands[p.id] = [];
@@ -1154,23 +1175,37 @@ window.handleStartGame = async () => {
         }
     });
 
-    // اختيار أول بطاقة آمنة
+    // 3. اختيار أول بطاقة وفق القواعد الخاصة
     let firstCard;
-    do {
+    while (true) {
         firstCard = deck.pop();
-    } while (firstCard === "wildDrawFour" || firstCard === "Eraser");
-
-    // تحديد اللاعب العشوائي
-    const startingPlayerIndex = Math.floor(Math.random() * activePlayers.length);
-    const startingPlayerId = activePlayers[startingPlayerIndex].id;
-
-    let initialDirection = firstCard.includes("Reverse") ? -1 : 1;
-
-    let initialSelectedColor = "";
-    if (firstCard === "wildColor") {
-        const colors = ["red", "blue", "green", "yellow"];
-        initialSelectedColor = colors[Math.floor(Math.random() * 4)];
+        // إذا كانت +4 أو +2 أو ماسح، نعيدها لأسفل الكومة ونسحب غيرها
+        if (firstCard === "wildDrawFour" || firstCard.includes("DrawTwo") || firstCard === "Eraser") {
+            deck.unshift(firstCard); 
+        } else {
+            break; // بطاقة صالحة للبدء
+        }
     }
+
+    // 4. معالجة تأثير البطاقة الأولى على حالة اللعب
+    let initialDirection = 1; // 1 = عادي، -1 = عكسي
+    let startingPlayerIndex = 0; // افتراضياً يبدأ اللاعب صاحب Slot-0
+    let initialDrawStack = 0;
+
+    // حالة بطاقة العكس (Reverse) كأول بطاقة
+    if (firstCard.includes("Reverse")) {
+        initialDirection = -1;
+        // في أونو الرسمية، إذا كانت العكس هي الأولى، يبدأ صاحب المركز الأخير (أو العكس)
+        // لكن هنا سنعكس الاتجاه فقط ونبدأ من اللاعب الأول في الاتجاه الجديد
+    }
+
+    // حالة بطاقة التخطي (Skip) كأول بطاقة
+    if (firstCard.includes("Skip")) {
+        // يتم تخطي اللاعب الأول (Index 0) لينتقل الدور للاعب التالي فوراً
+        startingPlayerIndex = (0 + initialDirection + activePlayers.length) % activePlayers.length;
+    }
+
+    const startingPlayerId = activePlayers[startingPlayerIndex].id;
 
     const gameState = {
         deck,
@@ -1179,20 +1214,22 @@ window.handleStartGame = async () => {
             currentTurnId: startingPlayerId,
             direction: initialDirection,
             drawStack: 0,
-            selectedColor: initialSelectedColor,
+            selectedColor: "", // إذا كانت Wild سيقوم النظام في صفحة اللعب بطلب اللون
             lastUpdated: serverTimestamp()
         }
     };
 
     try {
-        // 🔥 استبدال game بالكامل (لا دمج)
+        // تحديث اللعبة في قاعدة البيانات
         await set(ref(db, `rooms/${roomId}/game`), gameState);
 
-        // تحديث أيدي اللاعبين
         const updates = {};
         activePlayers.forEach(p => {
             updates[`rooms/${roomId}/players/${p.id}/hand`] = hands[p.id];
             updates[`rooms/${roomId}/players/${p.id}/handCount`] = hands[p.id].length;
+            // تصفير أي حالات سابقة
+            updates[`rooms/${roomId}/players/${p.id}/finishedRank`] = null;
+            updates[`rooms/${roomId}/players/${p.id}/saidUno`] = false;
         });
 
         updates[`rooms/${roomId}/status`] = "started";
@@ -1207,7 +1244,6 @@ window.handleStartGame = async () => {
         document.getElementById('startBtn').disabled = false;
     }
 };
-
 onValue(roomRef, (snap) => {
     const data = snap.val();
     if (data?.status === "started") {
