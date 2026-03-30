@@ -359,20 +359,28 @@ function extractCardsToDraw(count, currentDeck, currentDiscard) {
 function applyDynamicMargins() {
     const cards = document.querySelectorAll("#myHand .card");
     const count = cards.length;
+    
+    // إذا كانت هناك بطاقة واحدة أو لا شيء، نلغي الهوامش
     if (count <= 1) {
         if(cards[0]) cards[0].style.margin = "0";
         return;
     }
 
     const cardWidth = 65;
-    const targetDistance = 425; // المرجع الثابت الذي حددته
+    const targetDistance = 425; // النطاق الثابت لليد
     
-    // معادلتك لاستخراج الهامش المثالي
+    // 1. حساب الهامش المرن (بناءً على معادلتك)
     const idealMargin = (targetDistance - (count * cardWidth)) / ((count - 1) * 2);
 
+    // 2. تحديد أقصى هامش مسموح به للتباعد الطبيعي (مثلاً 5 بكسل)
+    const maxAllowedMargin = 5; 
+
+    // 3. السحر هنا: نأخذ القيمة الأصغر دائماً
+    const finalMargin = Math.min(idealMargin, maxAllowedMargin);
+
     cards.forEach(card => {
-        card.style.marginLeft = `${idealMargin}px`;
-        card.style.marginRight = `${idealMargin}px`;
+        card.style.marginLeft = `${finalMargin}px`;
+        card.style.marginRight = `${finalMargin}px`;
     });
 }
 
@@ -490,7 +498,7 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
                          card.isEraser; // الماسح
 
     if (myHand.length === 1 && isActionCard) {
-        return showToast("🚫 لا يمكنك إنهاء اللعبة ببطاقة أكشن! يجب أن تكون بطاقتك الأخيرة رقماً.");
+        return showToast("🚫يجب أن تكون بطاقتك الأخيرة رقماً.");
     }
     // ------------------------------------------
 
@@ -866,30 +874,28 @@ window.closeChallengeModal = function(result) {
         challengeResolver = null;
     }
 };
-// حساب نقاط اليد بدقة (لنظام النقاط)
+// 1. تحديث دالة حساب النقاط بدقة حسب معاييرك
 function calculateHandPoints(hand) {
     let total = 0;
-    if (!hand || hand.length === 0) return 0;
+    if (!hand || !Array.isArray(hand)) return 0;
     
     hand.forEach(cardStr => {
         const c = parseCard(cardStr);
-        
-        // 1. بطاقات الجوكر (50 نقطة)
-        if (c.isWild || c.isEraser || cardStr === "wildColor" || cardStr === "wildDrawFour" || cardStr === "Eraser") {
+        // بطاقات الجوكر (تغيير لون، +4، والماسح) تعطي 50 نقطة
+        if (c.isWild || c.isEraser || cardStr === "wildColor" || cardStr === "wildDrawFour") {
             total += 50;
         } 
-        // 2. بطاقات الأكشن (20 نقطة)
-        else if (c.value === "⊘" || c.value === "↻" || c.value === "+2") {
+        // بطاقات الأكشن (+2، عكس، تخطي) تعطي 20 نقطة
+        else if (["⊘", "↻", "+2"].includes(c.value) || c.value === "+2") {
             total += 20;
         } 
-        // 3. بطاقات الأرقام (تأخذ قيمتها الرقمية)
+        // بطاقات الأرقام تعطي قيمتها المكتوبة
         else if (!isNaN(parseInt(c.value))) {
             total += parseInt(c.value);
         }
     });
     return total;
 }
-
 // متغير لحفظ العداد حتى لا يتداخل إذا تم استدعاء الدالة مرتين
 let leaderboardInterval = null; 
 
@@ -903,81 +909,90 @@ window.showLeaderboard = function() {
     let sortedPlayers = [...activePlayersList];
     tbody.innerHTML = '';
 
-    // مصفوفة الأسماء التتابعية باللغة العربية
     const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
 
     if (isPointsMode) {
+        // ==========================================
         // --- 1. نظام النقاط ---
-        systemTypeElement.innerText = "نظام الفوز: النقاط (الترتيب بالرصيد)";
-        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>النقاط</th>`;
+        // ==========================================
+        systemTypeElement.innerText = "نظام الفوز: النقاط (الترتيب بالرصيد الأصغر)";
+        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>النقاط</th>`;
         
-        // حساب النقاط لجميع اللاعبين
+        // حساب النقاط لكل لاعب بناءً على بطاقاته الحالية في الـ Firebase
         sortedPlayers.forEach(p => {
-            p.points = calculateHandPoints(p.hand);
-        });
-
-        // الترتيب الواقعي لنظام النقاط:
-        // أ- الشخص الذي أنهى أوراقه (يده فارغة) هو الأول دائماً (0 نقاط).
-        // ب- بقية اللاعبين يتم ترتيبهم من الأقل نقاطاً إلى الأعلى نقاطاً.
-        sortedPlayers.sort((a, b) => {
-            const aCount = a.hand ? a.hand.length : 0;
-            const bCount = b.hand ? b.hand.length : 0;
-
-            // إذا أحدهما يملك 0 بطاقات، فهو الفائز الحتمي بالمركز الأول
-            if (aCount === 0) return -1;
-            if (bCount === 0) return 1;
-
-            // البقية يتم ترتيبهم حسب النقاط (الأقل نقاطاً أولاً)
-            return a.points - b.points;
+            const serverPlayer = playersData[p.id];
+            p.points = calculateHandPoints(serverPlayer ? serverPlayer.hand : []);
         });
         
-        // رسم جدول النقاط
+        // ترتيب تصاعدي: صاحب النقاط الأقل هو الأول
+        sortedPlayers.sort((a, b) => a.points - b.points);
+        
+        // رسم الجدول
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
             const rowClass = isMe ? 'is-me-row' : '';
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
             const rankText = rankNames[idx] || (idx + 1);
             
-            tbody.innerHTML += `<tr class="${rowClass}"><td>${rankText}</td><td>${playerName}</td><td>${p.points}</td></tr>`;
+            tbody.innerHTML += `
+                <tr class="${rowClass}">
+                    <td>${rankText}</td>
+                    <td>${playerName}</td>
+                    <td>${p.points} نقطة</td>
+                </tr>`;
         });
 
     } else {
+        // ==========================================
         // --- 2. النظام التتابعي ---
+        // ==========================================
         systemTypeElement.innerText = "نظام الفوز: التتابعي (الخروج المتسلسل)";
-        headers.innerHTML = `<th>المركز</th><th>اللاعب</th><th>الحالة</th>`;
+        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>الحالة</th>`;
         
-        // الترتيب الواقعي للنظام التتابعي:
-        // أ- من يملك finishedRank يرتبون تصاعدياً حسب من خرج أولاً.
-        // ب- من لم يخرجوا بعد (بقيت معهم بطاقات) يتم ترتيبهم حسب الأقل بطاقات.
-        sortedPlayers.sort((a, b) => {
-            const rankA = a.finishedRank || 999;
-            const rankB = b.finishedRank || 999;
+        sortedPlayers.forEach(p => {
+            const serverPlayer = playersData[p.id];
+            // إذا لم ينتهِ، نضع له ترتيب افتراضي متأخر جداً (999)
+            p.finRank = p.finishedRank || 999;
+            // حفظ عدد البطاقات للمقارنة بين الذين لم ينتهوا
+            p.hCount = serverPlayer ? (serverPlayer.handCount || 0) : 0;
+        });
 
-            if (rankA !== rankB) {
-                return rankA - rankB; // ترتيب الخارجين أولاً
-            } else {
-                // لو تساووا (مثلاً اللعبة قُطعت وبقي اثنان لم ينتهوا) نرتبهم حسب الأقل بطاقات
-                const countA = a.hand ? a.hand.length : 999;
-                const countB = b.hand ? b.hand.length : 999;
-                return countA - countB;
+        // الترتيب:
+        // 1. حسب من خرج أولاً (finishedRank أصغر).
+        // 2. إذا تساووا (كلاهما لم يخرج 999)، يرتبون حسب الأقل بطاقات.
+        sortedPlayers.sort((a, b) => {
+            if (a.finRank !== b.finRank) {
+                return a.finRank - b.finRank;
             }
+            return a.hCount - b.hCount; 
         });
         
-        // رسم جدول النظام التتابعي
+        // رسم الجدول
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
             const rowClass = isMe ? 'is-me-row' : '';
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
-            
             const rankText = rankNames[idx] || (idx + 1);
-            const statusText = p.finishedRank ? "تم إنهاء الأوراق" : `بقي معه (${p.handCount || 0}) بطاقات`;
             
-            tbody.innerHTML += `<tr class="${rowClass}"><td>${rankText}</td><td>${playerName}</td><td>${statusText}</td></tr>`;
+            // تحديد النص الذي سيظهر في خانة الحالة
+            let statusText = "";
+            if (p.finishedRank) {
+                statusText = `تم إنهاء الأوراق (${rankText})`;
+            } else {
+                statusText = `تبقّى معه ${p.hCount} بطاقات`;
+            }
+            
+            tbody.innerHTML += `
+                <tr class="${rowClass}">
+                    <td>${rankText}</td>
+                    <td>${playerName}</td>
+                    <td>${statusText}</td>
+                </tr>`;
         });
     }
     
     modal.style.display = 'flex';
-
+        
     // ==========================================
     // --- منطق العد التنازلي والانتقال التلقائي ---
     // ==========================================
@@ -986,6 +1001,7 @@ window.showLeaderboard = function() {
     const countdownText = document.getElementById('countdown-text');
     const totalOffset = 176;
 
+    // تصفير العداد بصرياً في حال ظهرت اللوحة مرة أخرى
     if (timerBar) timerBar.style.strokeDashoffset = 0;
     if (countdownText) countdownText.innerText = timeLeft;
 
@@ -1004,6 +1020,7 @@ window.showLeaderboard = function() {
         }
     }, 1000);
 };
+
 // دالة النقل والتصفير التي تُستدعى عند انتهاء الوقت
 async function handleAutoTransition() {
     if (!playersData || !playersData[playerId]) return;
