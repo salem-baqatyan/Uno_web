@@ -360,27 +360,29 @@ function applyDynamicMargins() {
     const cards = document.querySelectorAll("#myHand .card");
     const count = cards.length;
     
-    // إذا كانت هناك بطاقة واحدة أو لا شيء، نلغي الهوامش
+    // إذا لم يكن هناك بطاقات أو بطاقة واحدة
     if (count <= 1) {
-        if(cards[0]) cards[0].style.margin = "0";
+        if (cards[0]) cards[0].style.margin = "0";
         return;
     }
 
     const cardWidth = 65;
-    const targetDistance = 425; // النطاق الثابت لليد
-    
-    // 1. حساب الهامش المرن (بناءً على معادلتك)
-    const idealMargin = (targetDistance - (count * cardWidth)) / ((count - 1) * 2);
+    const targetDistance = 425; // المرجع الثابت
+    let idealMargin = 0;
 
-    // 2. تحديد أقصى هامش مسموح به للتباعد الطبيعي (مثلاً 5 بكسل)
-    const maxAllowedMargin = 5; 
+    // الشرط المحدث بناءً على رغبتك
+    if (count <= 17) {
+        // إذا كان عدد البطاقات 17 أو أقل، نثبت الهامش على القيمة التي حددتها
+        idealMargin = -21.4;
+    } else {
+        // إذا زاد العدد عن 17، تعمل المعادلة المرنة لتقليص المساحة
+        idealMargin = (targetDistance - (count * cardWidth)) / ((count - 1) * 2);
+    }
 
-    // 3. السحر هنا: نأخذ القيمة الأصغر دائماً
-    const finalMargin = Math.min(idealMargin, maxAllowedMargin);
-
+    // تطبيق الهامش على جميع البطاقات
     cards.forEach(card => {
-        card.style.marginLeft = `${finalMargin}px`;
-        card.style.marginRight = `${finalMargin}px`;
+        card.style.marginLeft = `${idealMargin}px`;
+        card.style.marginRight = `${idealMargin}px`;
     });
 }
 
