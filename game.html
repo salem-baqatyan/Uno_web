@@ -462,20 +462,23 @@ function isValidMove(playedStr) {
     const activeCol = gameState.turnState.selectedColor || top.color;
     const drawStack = gameState.turnState.drawStack || 0;
 
-    // إذا كانت البطاقة الملعوبة هي الماسح
+    // --- تعديل شرط بطاقة الماسح لتكون دفاعية فقط ---
     if (played.isEraser) {
-        // لا تُلعب إلا إذا كان هناك سحب (تراكم) موجه للاعب
+        // لا تُلعب إلا إذا كان هناك تراكم (سحب) موجه للاعب في دوره الحالي
+        // وبما أن الدالة تُستدعى في handContainer والضغط مرتبط بكون الدور للاعب،
+        // فإن وجود drawStack > 0 هنا يعني أن التراكم يخص اللاعب الحالي.
         return drawStack > 0;
     }
 
-    // إذا كان هناك تراكم، يجب اللعب بـ +2 أو +4 فقط
+    // إذا كان هناك تراكم، يجب الرد بـ +2 أو +4 أو الماسح (الذي عالجناه في الشرط الأعلى)
     if (drawStack > 0) {
         return (played.value === "+2" || played.value === "+4");
     }
+    // ------------------------------------------------
 
+    // اللعب الطبيعي: لا يمكن لعب الماسح هنا أبداً
     return played.isWild || played.color === activeCol || played.value === top.value;
 }
-
 async function handlePlayCard(cardStr, cardIndex) {
     if (!isValidMove(cardStr)) return alert("لا يمكنك لعب هذه البطاقة!");
 
@@ -528,10 +531,8 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
             skipNext = true;
         } else if (card.value === "+2") {
             addedStack = 2;
-            if (playersStillPlaying === 2) skipNext = true;
         } else if (card.value === "+4") {
             addedStack = 4;
-            if (playersStillPlaying === 2) skipNext = true;
         }
         newDrawStack += addedStack;
     }
@@ -567,6 +568,9 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     const updates = {};
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+
+    const currentMoves = playersData[playerId].movesCount || 0;
+    updates[`rooms/${roomId}/players/${playerId}/movesCount`] = currentMoves + 1;
 
     if (myRank) updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
 
@@ -629,6 +633,9 @@ window.acceptDrawStack = async function() {
     
     // --- السطر الجديد هنا ---
     updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false;
+
+    const currentMoves = playersData[playerId].movesCount || 0;
+    updates[`rooms/${roomId}/players/${playerId}/movesCount`] = currentMoves + 1;
     
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
     updates[`rooms/${roomId}/game/turnState/drawStack`] = 0;
@@ -658,6 +665,9 @@ document.getElementById('deckPile').onclick = async () => {
     
     // --- السطر الجديد هنا ---
     updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false;
+
+    const currentMoves = playersData[playerId].movesCount || 0;
+    updates[`rooms/${roomId}/players/${playerId}/movesCount`] = currentMoves + 1;
     
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
     
@@ -742,7 +752,6 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
     // 2. توزيع المقاعد بناءً على العدد (يمين، أعلى، يسار)
     // قمت بتعديل التقسيم ليكون أكثر توازناً
     const configs = {
-        1: { left: 0, top: 1, right: 0 },
         2: { left: 1, top: 0, right: 1 },
         3: { left: 1, top: 1, right: 1 },
         4: { left: 2, top: 0, right: 2 },
@@ -863,7 +872,7 @@ let challengeResolver = null; // متغير لحفظ الرد
 window.openChallengeModal = function(targetName) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('challengeModal');
-        document.getElementById('challengeText').innerText = `هل أنت متأكد من تقديم اعتراض ضد (${targetName}) بأنه لم يضغط زر UNO؟\n\nستُعاقب بسحب بطاقة إذا كان قد ضغط الزر فعلاً!`;
+        document.getElementById('challengeText').innerText = `هل أنت متأكد من تقديم اعتراض ضد (${targetName})\n\n بأنه لم يضغط زر UNO؟\n\nستُعاقب بسحب بطاقة إذا كان قد ضغط الزر فعلاً!`;
         overlay.style.display = 'flex';
         challengeResolver = resolve; // نعلق الرد حتى يضغط المستخدم زر
     });
@@ -949,7 +958,8 @@ window.showLeaderboard = function() {
         // --- 2. النظام التتابعي ---
         // ==========================================
         systemTypeElement.innerText = "نظام الفوز: التتابعي (الخروج المتسلسل)";
-        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>الحالة</th>`;
+        // قمنا بتغيير الرأس الأخير ليكون "عدد الأدوار"
+        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>عدد الأدوار</th>`;
         
         sortedPlayers.forEach(p => {
             const serverPlayer = playersData[p.id];
@@ -957,11 +967,13 @@ window.showLeaderboard = function() {
             p.finRank = p.finishedRank || 999;
             // حفظ عدد البطاقات للمقارنة بين الذين لم ينتهوا
             p.hCount = serverPlayer ? (serverPlayer.handCount || 0) : 0;
+            // جلب عدد الحركات من السيرفر
+            p.movesCount = serverPlayer ? (serverPlayer.movesCount || 0) : 0;
         });
 
         // الترتيب:
         // 1. حسب من خرج أولاً (finishedRank أصغر).
-        // 2. إذا تساووا (كلاهما لم يخرج 999)، يرتبون حسب الأقل بطاقات.
+        // 2. إذا تساووا (كلاهما لم يخرج 999)، يرتبون حسب الأقل بطاقات متبقية.
         sortedPlayers.sort((a, b) => {
             if (a.finRank !== b.finRank) {
                 return a.finRank - b.finRank;
@@ -976,19 +988,14 @@ window.showLeaderboard = function() {
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
             const rankText = rankNames[idx] || (idx + 1);
             
-            // تحديد النص الذي سيظهر في خانة الحالة
-            let statusText = "";
-            if (p.finishedRank) {
-                statusText = `تم إنهاء الأوراق (${rankText})`;
-            } else {
-                statusText = `تبقّى معه ${p.hCount} بطاقات`;
-            }
+            // هنا يظهر عدد الحركات أو الأدوار التي قام بها اللاعب
+            const movesText = `${p.movesCount} دور`;
             
             tbody.innerHTML += `
                 <tr class="${rowClass}">
                     <td>${rankText}</td>
                     <td>${playerName}</td>
-                    <td>${statusText}</td>
+                    <td>${movesText}</td>
                 </tr>`;
         });
     }
@@ -1037,7 +1044,8 @@ async function handleAutoTransition() {
         [`rooms/${roomId}/players/${playerId}/hand`]: null,
         [`rooms/${roomId}/players/${playerId}/handCount`]: null,
         [`rooms/${roomId}/players/${playerId}/finishedRank`]: null,
-        [`rooms/${roomId}/players/${playerId}/saidUno`]: null
+        [`rooms/${roomId}/players/${playerId}/saidUno`]: null,
+        [`rooms/${roomId}/players/${playerId}/movesCount`]: null
     };
     await update(ref(db), playerUpdates);
 
