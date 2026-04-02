@@ -200,6 +200,9 @@
     font-size: 1.2rem;
     color: white;
 }
+.is-disconnected-gray { opacity: 0.5; filter: grayscale(1); }
+.is-leaver-row { color: gray; background-color: #f0f0f0; }
+.disconnect-timer { position: absolute; top: 0; left: 0; background: red; color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -272,10 +275,10 @@
 </div>
 </div>
 
+<script src="/strings/seat_positions.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, update, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
-
+import { getDatabase, ref, update, onValue, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
     authDomain: "uno-4ed20.firebaseapp.com",
@@ -292,6 +295,21 @@ const db = getDatabase(app);
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
 const playerId = urlParams.get('p');
+
+// مراجع الاتصال الخاصة باللاعب
+const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+
+// 1. تفعيل وضع الانتظار عند غلق الصفحة
+onDisconnect(myPlayerRef).update({
+    isDisconnected: true,
+    disconnectTime: serverTimestamp()
+});
+
+// 2. إذا دخل اللاعب الصفحة مجدداً وكان في وضع الانتظار، نلغيه فوراً ليعود للعب
+update(myPlayerRef, {
+    isDisconnected: false,
+    disconnectTime: null
+});
 
 const gameRef = ref(db, `rooms/${roomId}/game`);
 const playersRef = ref(db, `rooms/${roomId}/players`);
@@ -464,9 +482,6 @@ function isValidMove(playedStr) {
 
     // --- تعديل شرط بطاقة الماسح لتكون دفاعية فقط ---
     if (played.isEraser) {
-        // لا تُلعب إلا إذا كان هناك تراكم (سحب) موجه للاعب في دوره الحالي
-        // وبما أن الدالة تُستدعى في handContainer والضغط مرتبط بكون الدور للاعب،
-        // فإن وجود drawStack > 0 هنا يعني أن التراكم يخص اللاعب الحالي.
         return drawStack > 0;
     }
 
@@ -750,98 +765,52 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
     const count = playersArray.length;
     
     // 2. مصفوفة المواقع بناءً على صورتك التوضيحية (النسب المئوية)
-    // الترتيب في المصفوفات يبدأ دائماً من اليسار صعوداً ثم يميناً نزولاً
-    const seatPositions = {
-        2: [
-            { side: 'left', top: 50, left: 15 },    // اللاعب 1 (يسار المنتصف)
-            { side: 'right', top: 50, right: 15 }   // اللاعب 2 (يمين المنتصف)
-        ],
-        3: [
-            { side: 'left', top: 50, left: 15 },    // 1
-            { side: 'top', top: 20, left: 50 },     // 2 (أعلى المنتصف)
-            { side: 'right', top: 50, right: 15 }   // 3
-        ],
-        4: [
-            { side: 'left', top: 60, left: 15 },    // 1 (يسار أسفل)
-            { side: 'left', top: 30, left: 15 },    // 2 (يسار أعلى)
-            { side: 'right', top: 30, right: 15 },  // 3 (يمين أعلى)
-            { side: 'right', top: 60, right: 15 }   // 4 (يمين أسفل)
-        ],
-        5: [
-            { side: 'left', top: 60, left: 15 },    // 1
-            { side: 'left', top: 30, left: 15 },    // 2
-            { side: 'top', top: 20, left: 50 },     // 3 (أعلى)
-            { side: 'right', top: 30, right: 15 },  // 4
-            { side: 'right', top: 60, right: 15 }   // 5
-        ],
-        6: [
-            { side: 'left', top: 60, left: 15 },    // 1
-            { side: 'left', top: 30, left: 15 },    // 2
-            { side: 'top', top: 20, left: 35 },     // 3 (أعلى يسار)
-            { side: 'top', top: 20, left: 65 },     // 4 (أعلى يمين)
-            { side: 'right', top: 30, right: 15 },  // 5
-            { side: 'right', top: 60, right: 15 }   // 6
-        ],
-        7: [
-            { side: 'left', top: 60, left: 15 },    // 1
-            { side: 'left', top: 30, left: 15 },    // 2
-            { side: 'top', top: 20, left: 25 },     // 3
-            { side: 'top', top: 20, left: 50 },     // 4
-            { side: 'top', top: 20, left: 75 },     // 5
-            { side: 'right', top: 30, right: 15 },  // 6
-            { side: 'right', top: 60, right: 15 }   // 7
-        ],
-        8: [
-            { side: 'left', top: 70, left: 15 },    // 1 (يسار أسفل)
-            { side: 'left', top: 45, left: 15 },    // 2 (يسار وسط)
-            { side: 'left', top: 20, left: 15 },    // 3 (يسار أعلى)
-            { side: 'top', top: 15, left: 50 },     // 4
-            { side: 'top', top: 15, left: 75 },     // 5
-            { side: 'right', top: 20, right: 15 },  // 6
-            { side: 'right', top: 45, right: 15 },  // 7
-            { side: 'right', top: 70, right: 15 }   // 8
-        ],
-        9: [
-            { side: 'left', top: 70, left: 15 },    // 1
-            { side: 'left', top: 45, left: 15 },    // 2
-            { side: 'left', top: 20, left: 15 },    // 3
-            { side: 'top', top: 15, left: 30 },     // 4
-            { side: 'top', top: 15, left: 50 },     // 5
-            { side: 'top', top: 15, left: 70 },     // 6
-            { side: 'right', top: 20, right: 15 },  // 7
-            { side: 'right', top: 45, right: 15 },  // 8
-            { side: 'right', top: 70, right: 15 }   // 9
-        ],
-        10: [
-            { side: 'left', top: 75, left: 15 },    // 1
-            { side: 'left', top: 55, left: 15 },    // 2
-            { side: 'left', top: 35, left: 15 },    // 3
-            { side: 'top', top: 20, left: 25 },     // 4
-            { side: 'top', top: 20, left: 40 },     // 5
-            { side: 'top', top: 20, left: 60 },     // 6
-            { side: 'top', top: 20, left: 75 },     // 7
-            { side: 'right', top: 35, right: 15 },  // 8
-            { side: 'right', top: 55, right: 15 },  // 9
-            { side: 'right', top: 75, right: 15 }   // 10
-        ]
-    };
-
     // جلب نمط التوزيع المناسب لعدد اللاعبين
     const activeConfig = seatPositions[count] || seatPositions[2];
-
     // 3. رسم اللاعبين بناءً على الترتيب الفعلي للسلوت
-    playersArray.forEach((p, i) => {
+playersArray.forEach((p, i) => {
         const pos = activeConfig[i];
-        if (!pos) return; // حماية في حال عدم توفر موقع
+        if (!pos) return; 
 
         const seat = document.createElement('div');
         
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
         const isFinished = p.finishedRank ? 'finished-player' : '';
         
-        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished}`;
+        // --- تعديل لحالة الانقطاع المؤقت ---
+        let disconnectClass = '';
+        let timerHTML = '';
         
-        // تطبيق التموضع الدقيق
+        if (p.isDisconnected && p.disconnectTime) {
+            disconnectClass = 'is-disconnected-gray'; // أضف هذا الكلاس في الـ CSS ليعطيه لون رمادي
+            
+            // حساب الوقت المتبقي من الـ 30 ثانية
+            const now = Date.now();
+            const elapsed = Math.floor((now - p.disconnectTime) / 1000);
+            const timeLeft = Math.max(0, 30 - elapsed);
+            
+            if (timeLeft > 0) {
+                timerHTML = `<div class="disconnect-timer">${timeLeft}</div>`;
+                
+                // تشغيل عداد تنازلي محلي في الواجهة
+                setTimeout(() => {
+                     window.layoutPlayers(playersData, myId, currentTurnId);
+                }, 1000);
+            } else {
+                // إذا انتهت الـ 30 ثانية ولم يعد اللاعب، يقوم الأدمن بمعالجة انسحابه
+                const playerList = Object.values(playersData).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+                const isAdmin = (playerList.length > 0 && myId === playerList[0].id);
+                
+                if (isAdmin) {
+                    handleLeaverLogic(p.id);
+                }
+            }
+        }
+        // -------------------------------------
+        
+        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${disconnectClass}`;
+        
+        // تطبيق التموضع الدقيق (احتفظ بكودك الأصلي للـ CSS هنا)
         if (pos.side === 'left') {
             seat.style.cssText = `top: ${pos.top}%; left: ${pos.left}px; transform: translateY(-50%);`;
         } else if (pos.side === 'right') {
@@ -854,7 +823,7 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
             <div class="avatar-wrap" onclick="handleChallenge('${p.id}')">
                 <img src="${p.avatar}">
                 <div class="card-count-badge ${isUnoDanger}">${p.handCount || 0}</div>
-            </div>
+                ${timerHTML} </div>
             <div class="player-name">${p.name}${p.id === myId ? ' <span class="me-tag">(أنت)</span>' : ''}</div>
         `;
         container.appendChild(seat);
@@ -862,6 +831,50 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 
     document.getElementById('playerCount').innerText = count;
 };
+
+async function handleLeaverLogic(leaverId) {
+    const updates = {};
+    const leaver = playersData[leaverId];
+    if (!leaver || leaver.team === "spectators-list") return; // تم معالجته مسبقاً
+
+    let deck = [...(gameState.deck || [])];
+    const leaverHand = leaver.hand || [];
+
+    // 1. سحب أوراق اللاعب المنسحب ووضعها أسفل كومة السحب
+    deck = leaverHand.concat(deck);
+    updates[`rooms/${roomId}/game/deck`] = deck;
+
+    // 2. تحويل اللاعب إلى الجمهور تلقائياً
+    updates[`rooms/${roomId}/players/${leaverId}/team`] = "spectators-list";
+    updates[`rooms/${roomId}/players/${leaverId}/slot`] = null;
+    updates[`rooms/${roomId}/players/${leaverId}/hand`] = null;
+    updates[`rooms/${roomId}/players/${leaverId}/handCount`] = 0;
+    
+    // 3. يظهر في لوحة النتائج كمنسحب (ترتيب متأخر جداً)
+    updates[`rooms/${roomId}/players/${leaverId}/finishedRank`] = 999; 
+    updates[`rooms/${roomId}/players/${leaverId}/isLeaver`] = true;
+
+    // 4. إذا كان عليه الدور، أو هناك تراكم سحب، نقوم بنقله للاعب التالي
+    if (gameState.turnState.currentTurnId === leaverId) {
+        let nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
+        
+        // إذا لم يتبقَ سواه ولاعب آخر، يفوز الآخر فوراً
+        const remainingPlayers = activePlayersList.filter(p => p.id !== leaverId && !p.finishedRank);
+        if (remainingPlayers.length === 1) {
+             updates[`rooms/${roomId}/game/status`] = 'finished';
+             updates[`rooms/${roomId}/players/${remainingPlayers[0].id}/finishedRank`] = 1;
+        } else {
+             // تحويل الدور والتراكم للاعب التالي
+             updates[`rooms/${roomId}/game/turnState/currentTurnId`] = nextPlayerId;
+             updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
+        }
+    }
+
+    await update(ref(db), updates);
+    
+    showToast(`🚫 اللاعب ${leaver.name} تم اعتباره منسحباً لقطع الاتصال!`);
+}
+
 window.handleChallenge = async function(targetId) {
     if (targetId === playerId) return; 
 
@@ -988,15 +1001,20 @@ window.showLeaderboard = function() {
         // رسم الجدول
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
-            const rowClass = isMe ? 'is-me-row' : '';
+            const isLeaver = playersData[p.id]?.isLeaver; // هل هو منسحب؟
+            
+            const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
-            const rankText = rankNames[idx] || (idx + 1);
+            
+            // إذا كان منسحب يكتب منسحب بدلاً من الترتيب
+            const rankText = isLeaver ? 'منسحب' : (rankNames[idx] || (idx + 1));
+            const movesText = isLeaver ? '--' : `${p.movesCount} دور`;
             
             tbody.innerHTML += `
                 <tr class="${rowClass}">
                     <td>${rankText}</td>
                     <td>${playerName}</td>
-                    <td>${p.points} نقطة</td>
+                    <td>${movesText}</td>
                 </tr>`;
         });
 
