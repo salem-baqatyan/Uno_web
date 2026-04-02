@@ -456,7 +456,6 @@ input:disabled + .slider {
 const container = document.getElementById('settings-container');
 
 if (container) {
-    // إضافة تباعد عمودي بين الصفوف (Rows) بمقدار 20px
     container.style.display = "flex";
     container.style.flexDirection = "column";
     container.style.gap = "5px"; 
@@ -498,7 +497,6 @@ function renderBox(s) {
     const eraserBox = eraserToggle.closest('.setting-box'); // للحصول على الحاوية الأب لتغيير شكلها
 
     if (!stackingToggle.checked) {
-        // إذا كان التراكم معطلاً
         eraserToggle.checked = false; // إطفاء الماسح تلقائياً
         eraserToggle.disabled = true; // منع النقر عليه
         eraserBox.style.opacity = "0.4"; // جعل الصندوق باهتاً
@@ -511,10 +509,8 @@ function renderBox(s) {
     }
 }
 
-// تأكد من استدعاء هذه الدالة عند تحميل الصفحة وأيضاً عند تغيير حالة التراكم
 document.getElementById('toggle-stacking').addEventListener('change', updateEraserStatus);
 
-// استدعاء أولي لضبط الحالة عند فتح الردهة
 updateEraserStatus();
 /* ---------- 1. Setup & Config ---------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
