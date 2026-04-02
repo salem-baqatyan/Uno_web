@@ -200,9 +200,6 @@
     font-size: 1.2rem;
     color: white;
 }
-.is-disconnected-gray { opacity: 0.5; filter: grayscale(1); }
-.is-leaver-row { color: gray; background-color: #f0f0f0; }
-.disconnect-timer { position: absolute; top: 0; left: 0; background: red; color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -295,21 +292,6 @@ const db = getDatabase(app);
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
 const playerId = urlParams.get('p');
-
-// مراجع الاتصال الخاصة باللاعب
-const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
-
-// 1. تفعيل وضع الانتظار عند غلق الصفحة
-onDisconnect(myPlayerRef).update({
-    isDisconnected: true,
-    disconnectTime: serverTimestamp()
-});
-
-// 2. إذا دخل اللاعب الصفحة مجدداً وكان في وضع الانتظار، نلغيه فوراً ليعود للعب
-update(myPlayerRef, {
-    isDisconnected: false,
-    disconnectTime: null
-});
 
 const gameRef = ref(db, `rooms/${roomId}/game`);
 const playersRef = ref(db, `rooms/${roomId}/players`);
@@ -768,49 +750,18 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
     // جلب نمط التوزيع المناسب لعدد اللاعبين
     const activeConfig = seatPositions[count] || seatPositions[2];
     // 3. رسم اللاعبين بناءً على الترتيب الفعلي للسلوت
-playersArray.forEach((p, i) => {
+    playersArray.forEach((p, i) => {
         const pos = activeConfig[i];
-        if (!pos) return; 
+        if (!pos) return; // حماية في حال عدم توفر موقع
 
         const seat = document.createElement('div');
         
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
         const isFinished = p.finishedRank ? 'finished-player' : '';
         
-        // --- تعديل لحالة الانقطاع المؤقت ---
-        let disconnectClass = '';
-        let timerHTML = '';
+        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished}`;
         
-        if (p.isDisconnected && p.disconnectTime) {
-            disconnectClass = 'is-disconnected-gray'; // أضف هذا الكلاس في الـ CSS ليعطيه لون رمادي
-            
-            // حساب الوقت المتبقي من الـ 30 ثانية
-            const now = Date.now();
-            const elapsed = Math.floor((now - p.disconnectTime) / 1000);
-            const timeLeft = Math.max(0, 30 - elapsed);
-            
-            if (timeLeft > 0) {
-                timerHTML = `<div class="disconnect-timer">${timeLeft}</div>`;
-                
-                // تشغيل عداد تنازلي محلي في الواجهة
-                setTimeout(() => {
-                     window.layoutPlayers(playersData, myId, currentTurnId);
-                }, 1000);
-            } else {
-                // إذا انتهت الـ 30 ثانية ولم يعد اللاعب، يقوم الأدمن بمعالجة انسحابه
-                const playerList = Object.values(playersData).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
-                const isAdmin = (playerList.length > 0 && myId === playerList[0].id);
-                
-                if (isAdmin) {
-                    handleLeaverLogic(p.id);
-                }
-            }
-        }
-        // -------------------------------------
-        
-        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${disconnectClass}`;
-        
-        // تطبيق التموضع الدقيق (احتفظ بكودك الأصلي للـ CSS هنا)
+        // تطبيق التموضع الدقيق
         if (pos.side === 'left') {
             seat.style.cssText = `top: ${pos.top}%; left: ${pos.left}px; transform: translateY(-50%);`;
         } else if (pos.side === 'right') {
@@ -823,7 +774,7 @@ playersArray.forEach((p, i) => {
             <div class="avatar-wrap" onclick="handleChallenge('${p.id}')">
                 <img src="${p.avatar}">
                 <div class="card-count-badge ${isUnoDanger}">${p.handCount || 0}</div>
-                ${timerHTML} </div>
+            </div>
             <div class="player-name">${p.name}${p.id === myId ? ' <span class="me-tag">(أنت)</span>' : ''}</div>
         `;
         container.appendChild(seat);
@@ -831,50 +782,6 @@ playersArray.forEach((p, i) => {
 
     document.getElementById('playerCount').innerText = count;
 };
-
-async function handleLeaverLogic(leaverId) {
-    const updates = {};
-    const leaver = playersData[leaverId];
-    if (!leaver || leaver.team === "spectators-list") return; // تم معالجته مسبقاً
-
-    let deck = [...(gameState.deck || [])];
-    const leaverHand = leaver.hand || [];
-
-    // 1. سحب أوراق اللاعب المنسحب ووضعها أسفل كومة السحب
-    deck = leaverHand.concat(deck);
-    updates[`rooms/${roomId}/game/deck`] = deck;
-
-    // 2. تحويل اللاعب إلى الجمهور تلقائياً
-    updates[`rooms/${roomId}/players/${leaverId}/team`] = "spectators-list";
-    updates[`rooms/${roomId}/players/${leaverId}/slot`] = null;
-    updates[`rooms/${roomId}/players/${leaverId}/hand`] = null;
-    updates[`rooms/${roomId}/players/${leaverId}/handCount`] = 0;
-    
-    // 3. يظهر في لوحة النتائج كمنسحب (ترتيب متأخر جداً)
-    updates[`rooms/${roomId}/players/${leaverId}/finishedRank`] = 999; 
-    updates[`rooms/${roomId}/players/${leaverId}/isLeaver`] = true;
-
-    // 4. إذا كان عليه الدور، أو هناك تراكم سحب، نقوم بنقله للاعب التالي
-    if (gameState.turnState.currentTurnId === leaverId) {
-        let nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
-        
-        // إذا لم يتبقَ سواه ولاعب آخر، يفوز الآخر فوراً
-        const remainingPlayers = activePlayersList.filter(p => p.id !== leaverId && !p.finishedRank);
-        if (remainingPlayers.length === 1) {
-             updates[`rooms/${roomId}/game/status`] = 'finished';
-             updates[`rooms/${roomId}/players/${remainingPlayers[0].id}/finishedRank`] = 1;
-        } else {
-             // تحويل الدور والتراكم للاعب التالي
-             updates[`rooms/${roomId}/game/turnState/currentTurnId`] = nextPlayerId;
-             updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
-        }
-    }
-
-    await update(ref(db), updates);
-    
-    showToast(`🚫 اللاعب ${leaver.name} تم اعتباره منسحباً لقطع الاتصال!`);
-}
-
 window.handleChallenge = async function(targetId) {
     if (targetId === playerId) return; 
 
@@ -1001,20 +908,15 @@ window.showLeaderboard = function() {
         // رسم الجدول
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
-            const isLeaver = playersData[p.id]?.isLeaver; // هل هو منسحب؟
-            
-            const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
+            const rowClass = isMe ? 'is-me-row' : '';
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
-            
-            // إذا كان منسحب يكتب منسحب بدلاً من الترتيب
-            const rankText = isLeaver ? 'منسحب' : (rankNames[idx] || (idx + 1));
-            const movesText = isLeaver ? '--' : `${p.movesCount} دور`;
+            const rankText = rankNames[idx] || (idx + 1);
             
             tbody.innerHTML += `
                 <tr class="${rowClass}">
                     <td>${rankText}</td>
                     <td>${playerName}</td>
-                    <td>${movesText}</td>
+                    <td>${p.points} نقطة</td>
                 </tr>`;
         });
 
