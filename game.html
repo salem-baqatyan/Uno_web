@@ -749,66 +749,113 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 
     const count = playersArray.length;
     
-    // 2. توزيع المقاعد بناءً على العدد (يمين، أعلى، يسار)
-    // قمت بتعديل التقسيم ليكون أكثر توازناً
-    const configs = {
-        2: { left: 1, top: 0, right: 1 },
-        3: { left: 1, top: 1, right: 1 },
-        4: { left: 2, top: 0, right: 2 },
-        5: { left: 2, top: 1, right: 2 },
-        6: { left: 2, top: 2, right: 2 },
-        7: { left: 2, top: 3, right: 2 },
-        8: { left: 3, top: 2, right: 3 },
-        9: { left: 3, top: 3, right: 3 },
-        10: { left: 4, top: 2, right: 4 }
+    // 2. مصفوفة المواقع بناءً على صورتك التوضيحية (النسب المئوية)
+    // الترتيب في المصفوفات يبدأ دائماً من اليسار صعوداً ثم يميناً نزولاً
+    const seatPositions = {
+        2: [
+            { side: 'left', top: 50, left: 15 },    // اللاعب 1 (يسار المنتصف)
+            { side: 'right', top: 50, right: 15 }   // اللاعب 2 (يمين المنتصف)
+        ],
+        3: [
+            { side: 'left', top: 50, left: 15 },    // 1
+            { side: 'top', top: 20, left: 50 },     // 2 (أعلى المنتصف)
+            { side: 'right', top: 50, right: 15 }   // 3
+        ],
+        4: [
+            { side: 'left', top: 60, left: 15 },    // 1 (يسار أسفل)
+            { side: 'left', top: 30, left: 15 },    // 2 (يسار أعلى)
+            { side: 'right', top: 30, right: 15 },  // 3 (يمين أعلى)
+            { side: 'right', top: 60, right: 15 }   // 4 (يمين أسفل)
+        ],
+        5: [
+            { side: 'left', top: 60, left: 15 },    // 1
+            { side: 'left', top: 30, left: 15 },    // 2
+            { side: 'top', top: 20, left: 50 },     // 3 (أعلى)
+            { side: 'right', top: 30, right: 15 },  // 4
+            { side: 'right', top: 60, right: 15 }   // 5
+        ],
+        6: [
+            { side: 'left', top: 60, left: 15 },    // 1
+            { side: 'left', top: 30, left: 15 },    // 2
+            { side: 'top', top: 20, left: 35 },     // 3 (أعلى يسار)
+            { side: 'top', top: 20, left: 65 },     // 4 (أعلى يمين)
+            { side: 'right', top: 30, right: 15 },  // 5
+            { side: 'right', top: 60, right: 15 }   // 6
+        ],
+        7: [
+            { side: 'left', top: 60, left: 15 },    // 1
+            { side: 'left', top: 30, left: 15 },    // 2
+            { side: 'top', top: 20, left: 25 },     // 3
+            { side: 'top', top: 20, left: 50 },     // 4
+            { side: 'top', top: 20, left: 75 },     // 5
+            { side: 'right', top: 30, right: 15 },  // 6
+            { side: 'right', top: 60, right: 15 }   // 7
+        ],
+        8: [
+            { side: 'left', top: 70, left: 15 },    // 1 (يسار أسفل)
+            { side: 'left', top: 45, left: 15 },    // 2 (يسار وسط)
+            { side: 'left', top: 20, left: 15 },    // 3 (يسار أعلى)
+            { side: 'top', top: 15, left: 50 },     // 4
+            { side: 'top', top: 15, left: 75 },     // 5
+            { side: 'right', top: 20, right: 15 },  // 6
+            { side: 'right', top: 45, right: 15 },  // 7
+            { side: 'right', top: 70, right: 15 }   // 8
+        ],
+        9: [
+            { side: 'left', top: 70, left: 15 },    // 1
+            { side: 'left', top: 45, left: 15 },    // 2
+            { side: 'left', top: 20, left: 15 },    // 3
+            { side: 'top', top: 15, left: 30 },     // 4
+            { side: 'top', top: 15, left: 50 },     // 5
+            { side: 'top', top: 15, left: 70 },     // 6
+            { side: 'right', top: 20, right: 15 },  // 7
+            { side: 'right', top: 45, right: 15 },  // 8
+            { side: 'right', top: 70, right: 15 }   // 9
+        ],
+        10: [
+            { side: 'left', top: 75, left: 15 },    // 1
+            { side: 'left', top: 55, left: 15 },    // 2
+            { side: 'left', top: 35, left: 15 },    // 3
+            { side: 'top', top: 20, left: 25 },     // 4
+            { side: 'top', top: 20, left: 40 },     // 5
+            { side: 'top', top: 20, left: 60 },     // 6
+            { side: 'top', top: 20, left: 75 },     // 7
+            { side: 'right', top: 35, right: 15 },  // 8
+            { side: 'right', top: 55, right: 15 },  // 9
+            { side: 'right', top: 75, right: 15 }   // 10
+        ]
     };
 
-    const config = configs[count] || configs[7];
-    let positions = [];
+    // جلب نمط التوزيع المناسب لعدد اللاعبين
+    const activeConfig = seatPositions[count] || seatPositions[2];
 
-    // ترتيب إضافة المواقع مهم جداً ليتطابق مع ترتيب المصفوفة:
-    
-    // أ- الجانب الأيسر (من الأسفل للأعلى)
-    for (let i = 0; i < config.left; i++) {
-        positions.push({ side: 'left', top: 80 - (i * (60 / Math.max(config.left, 1))) });
-    }
-
-    // ب- الجانب العلوي (من اليسار لليمين)
-    for (let i = 0; i < config.top; i++) {
-        positions.push({ side: 'top', left: (100 / (config.top + 1)) * (i + 1) });
-    }
-
-    // ج- الجانب الأيمن (من الأعلى للأسفل)
-    for (let i = 0; i < config.right; i++) {
-        positions.push({ side: 'right', top: 20 + (i * (60 / Math.max(config.right, 1))) });
-    }
-
-    // 3. رسم اللاعبين
+    // 3. رسم اللاعبين بناءً على الترتيب الفعلي للسلوت
     playersArray.forEach((p, i) => {
-        if (!positions[i]) return;
-        const pos = positions[i];
+        const pos = activeConfig[i];
+        if (!pos) return; // حماية في حال عدم توفر موقع
+
         const seat = document.createElement('div');
         
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
         const isFinished = p.finishedRank ? 'finished-player' : '';
         
-        seat.className = `player-seat ${p.slot} ${p.id===myId?'is-me':''} ${p.id===currentTurnId && !p.finishedRank ?'is-turn':''} ${isFinished}`;
+        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished}`;
         
-        // تطبيق التموضع
+        // تطبيق التموضع الدقيق
         if (pos.side === 'left') {
-            seat.style.cssText = `top:${pos.top}%; left:15px; transform:translateY(-50%);`;
+            seat.style.cssText = `top: ${pos.top}%; left: ${pos.left}px; transform: translateY(-50%);`;
         } else if (pos.side === 'right') {
-            seat.style.cssText = `top:${pos.top}%; right:15px; transform:translateY(-50%);`;
-        } else {
-            seat.style.cssText = `top:20px; left:${pos.left}%; transform:translateX(-50%);`;
+            seat.style.cssText = `top: ${pos.top}%; right: ${pos.right}px; transform: translateY(-50%);`;
+        } else if (pos.side === 'top') {
+            seat.style.cssText = `top: ${pos.top}px; left: ${pos.left}%; transform: translateX(-50%);`;
         }
 
         seat.innerHTML = `
             <div class="avatar-wrap" onclick="handleChallenge('${p.id}')">
                 <img src="${p.avatar}">
-                <div class="card-count-badge ${isUnoDanger}">${p.handCount||0}</div>
+                <div class="card-count-badge ${isUnoDanger}">${p.handCount || 0}</div>
             </div>
-            <div class="player-name">${p.name}${p.id===myId?' <span class="me-tag">(أنت)</span>':''}</div>
+            <div class="player-name">${p.name}${p.id === myId ? ' <span class="me-tag">(أنت)</span>' : ''}</div>
         `;
         container.appendChild(seat);
     });
