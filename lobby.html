@@ -471,11 +471,14 @@ if (container) {
 }
 
 function renderBox(s) {
+    // جلب القيمة الحالية من الإعدادات المحلية، وإذا لم تكن موجودة نستخدم القيمة الافتراضية من المصفوفة
+    const currentVal = localSettings[s.id] !== undefined ? localSettings[s.id] : s.val;
+
     const control = s.type === 'counter' 
         ? `<div class="counter-group">
             <button class="counter-btn" id="btn-${s.id}-inc" onclick="changeSetting('${s.id}', 1)">+</button>
-            <span class="counter-val" id="val-${s.id}">${s.val}</span>
-            <button class="counter-btn" id="btn-${s.id}-dec" onclick="changeSetting('${s.id}', -1)" ${s.val <= 1 ? 'disabled' : ''}>-</button>
+            <span class="counter-val" id="val-${s.id}">${currentVal}</span>
+            <button class="counter-btn" id="btn-${s.id}-dec" onclick="changeSetting('${s.id}', -1)" ${currentVal <= 1 ? 'disabled' : ''}>-</button>
            </div>`
         : `<div class="switch-container">
             <label class="switch">
