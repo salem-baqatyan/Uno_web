@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="img/logo.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="UNO! Pro">
     <link rel="apple-touch-icon" href="img/codenames_pro_icon.png">
     <title>UNO! Pro - Lobby</title>
     <style>
@@ -36,7 +39,7 @@ input:checked + .slider {
 }
 
 /* أيقونة المعلومات والمؤقت النشط */
-.info-icon, .active-label {
+.info-icon {
     background: var(--uno-yellow) !important;
     color: #000 !important;
 }
@@ -415,7 +418,7 @@ input:disabled + .slider {
                     <span id="label2">15ث</span>
                     <span id="label3">30ث</span>
                 </div>
-                <button class="save-btn" style="background:#444;" onclick="document.getElementById('timerModal').style.display='none'">إغلاق</button>
+                <button class="save-btn" style="background:#444;" onclick="document.getElementById('timerModal').style.display='none'">موافق</button>
             </div>
         </div>
 
@@ -452,27 +455,20 @@ input:disabled + .slider {
     { id: 'points', title: 'نظام النقاط', hint: 'يتغير هدف اللعبة: أول من ينهي أوراقه يحدد ترتيب البقية.', type: 'toggle', checked: false },
     { id: 'eraser', title: 'بطاقة الماسح', hint: 'تفعيل بطاقة بيضاء تمحو السحب المتراكم عليك.', type: 'toggle', checked: false }
 ];
-
-const container = document.getElementById('settings-container');
-
-if (container) {
-    container.style.display = "flex";
-    container.style.flexDirection = "column";
-    container.style.gap = "5px"; 
-
-    container.innerHTML = `
-        <div class="settings-grid-row">
-            ${settingsData.slice(0, 3).map(s => renderBox(s)).join('')}
-        </div>
-        <div class="settings-grid-row">
-            ${settingsData.slice(3, 6).map(s => renderBox(s)).join('')}
-        </div>
-    `;
-}
+// إعدادات الأونو الافتراضية
+const defaultSettings = {
+    players: 2, 
+    decks: 1, 
+    cards: 7,
+    stacking: true,
+    points: false,
+    eraser: false,
+    timer: 0
+};
+let localSettings = { ...defaultSettings };
 
 function renderBox(s) {
-    // جلب القيمة الحالية من الإعدادات المحلية، وإذا لم تكن موجودة نستخدم القيمة الافتراضية من المصفوفة
-    const currentVal = localSettings[s.id] !== undefined ? localSettings[s.id] : s.val;
+    const currentVal = (localSettings && localSettings[s.id] !== undefined) ? localSettings[s.id] : s.val;
 
     const control = s.type === 'counter' 
         ? `<div class="counter-group">
@@ -512,9 +508,6 @@ function renderBox(s) {
     }
 }
 
-document.getElementById('toggle-stacking').addEventListener('change', updateEraserStatus);
-
-updateEraserStatus();
 /* ---------- 1. Setup & Config ---------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, onDisconnect, update, runTransaction, remove, get, serverTimestamp } 
@@ -577,17 +570,6 @@ const avatarImages = [
     "img/avatar/photographer.webp", "img/avatar/pizza_guy.webp", "img/avatar/reader.webp",
     "img/avatar/surprised_man.webp",
 ];
-
-// إعدادات الأونو الافتراضية
-const defaultSettings = {
-    players: 2, 
-    decks: 1, 
-    cards: 7,
-    stacking: true,
-    points: false,
-    eraser: false,
-    timer: 0
-};
 
 // حدود الإعدادات للواجهة
 const gameSettingsLimits = {
@@ -776,19 +758,16 @@ function startHeartbeat() {
 /* ---------- 5. Lobby & Team Logic ---------- */
 document.getElementById('roomDisplay').innerText = "🔗 " + roomId;
 
-// بناء الخانات (بدون لاعبين، فقط الهيكل) بناءً على إعدادات الغرفة
 function updatePlayersGrid(numberOfPlayers) {
     const grid = document.getElementById('playersGrid');
     if (!grid) return;
     
-    // تأكد من ضبط اتجاه الـ Grid برمجياً لضمان البدء من اليسار
     grid.style.direction = "ltr"; 
     grid.innerHTML = ''; 
 
     for (let i = 0; i < numberOfPlayers; i++) {
         const box = document.createElement('div');
         box.className = `team-box ${slotColors[i]}`;
-        // جعل محتوى الكرت داخلياً RTL ليبقى النص العربي صحيحاً
         box.style.direction = "rtl"; 
         box.innerHTML = `
             <div class="slot-number">${i + 1}</div>
@@ -810,7 +789,6 @@ window.joinSlot = (index) => {
         return;
     }
 
-    // التأكد عبر Transaction أن الخانة غير محجوزة لتفادي تعارض اللاعبين
     runTransaction(playersRef, (players) => {
         if (players) {
             const isTaken = Object.values(players).some(p => p.slot === targetSlot && p.id !== playerId);
@@ -926,7 +904,6 @@ document.addEventListener('click', (e) => {
 
 /* ---------- 6. Admin & Game Settings ---------- */
 
-// تغيير الإعدادات الرقمية (اللاعبين، الحزم، البطاقات)
 window.changeSetting = async (type, delta) => {
     if (!isAdmin) return showToast("الآدمن فقط يمكنه تعديل الإعدادات");
     
@@ -943,7 +920,6 @@ window.changeSetting = async (type, delta) => {
     }
 };
 
-// تغيير إعدادات المفاتيح (Switch)
 window.toggleSetting = (type, isChecked) => {
     if (!isAdmin) {
         document.getElementById(`toggle-${type}`).checked = !isChecked; // إرجاع الزر لشكله
@@ -972,12 +948,37 @@ window.toggleAccordion = (header) => {
     if (!isVisible) { content.style.display = 'block'; header.classList.add('active'); }
 };
 
-// مستمع التغييرات لإعدادات الغرفة لتحديث الواجهة للجميع
-let localSettings = { ...defaultSettings };
 onValue(settingsRef, (snapshot) => {
     const s = snapshot.val();
     if (!s) return;
     localSettings = s;
+
+    const container = document.getElementById('settings-container');
+    if (container) {
+        container.style.display = "flex";
+        container.style.flexDirection = "column";
+        container.style.gap = "5px"; 
+
+        container.innerHTML = `
+            <div class="settings-grid-row">
+                ${settingsData.slice(0, 3).map(setting => renderBox(setting)).join('')}
+            </div>
+            <div class="settings-grid-row">
+                ${settingsData.slice(3, 6).map(setting => renderBox(setting)).join('')}
+            </div>
+        `;
+
+        // 🟢 أضف الأسطر هنا بعد أن تضمن أن الصناديق تم إنشاؤها في الـ DOM
+        const stackingToggle = document.getElementById('toggle-stacking');
+        if (stackingToggle) {
+            // نزيل المستمع القديم أولاً (للاحتياط عند تكرار التحديث) ثم نضيفه مجدداً
+            stackingToggle.removeEventListener('change', updateEraserStatus);
+            stackingToggle.addEventListener('change', updateEraserStatus);
+            
+            // تحديث حالة زر الماسح فوراً بناءً على حالة التراكم القادمة من السيرفر
+            updateEraserStatus();
+        }
+    }
 
     // تحديث الأرقام
     if(document.getElementById('val-players')) document.getElementById('val-players').innerText = s.players;
@@ -999,11 +1000,9 @@ onValue(settingsRef, (snapshot) => {
     if(document.getElementById('toggle-points')) document.getElementById('toggle-points').checked = s.points;
     if(document.getElementById('toggle-eraser')) document.getElementById('toggle-eraser').checked = s.eraser;
 
-    // تحديث شبكة اللاعبين إذا تغير العدد
     const currentSlots = document.querySelectorAll('.team-box').length;
     if(currentSlots !== s.players) {
         updatePlayersGrid(s.players);
-        // نعيد استدعاء renderLobby لوضع اللاعبين في الخانات الجديدة
         get(playersRef).then(snap => {
             if(snap.exists()) {
                 const sorted = Object.values(snap.val()).sort((a, b) => a.joinedAt - b.joinedAt);
@@ -1035,10 +1034,14 @@ onValue(settingsRef, (snapshot) => {
     const timerSlider = document.getElementById('timerSlider');
     const valMap = { 0: 0, 5: 1, 15: 2, 30: 3 };
     if(timerSlider) timerSlider.value = valMap[seconds] || 0;
+
+    get(playersRef).then(snap => {
+        if(snap.exists()) {
+            updateStartButtonText(snap.val(), s);
+        }
+    });
 });
 
-
-// مستمع اللاعبين الرئيسي (يعتمد على localSettings)
 onValue(playersRef, (snapshot) => {
     const players = snapshot.val();
     if (!players) return;
@@ -1050,27 +1053,8 @@ onValue(playersRef, (snapshot) => {
     const adminId = onlinePlayers.length > 0 ? onlinePlayers[0].id : null;
     isAdmin = (playerId === adminId);
     
-    const startBtn = document.getElementById('startBtn');
-    if (startBtn) {
-        startBtn.style.display = isAdmin ? 'block' : 'none';
-        
-        // حساب اللاعبين المنضمين للسلوتات حالياً
-        const slottedPlayersCount = playerList.filter(p => p.slot && p.slot.startsWith('slot-')).length;
-        const isFull = slottedPlayersCount === localSettings.players;
-
-        if (isAdmin) {
-            if (isFull) {
-                startBtn.disabled = false;
-                startBtn.style.opacity = "1";
-                startBtn.style.cursor = "pointer";
-                startBtn.innerText = "ابدأ اللعبة الآن";
-            } else {
-                startBtn.disabled = false; // نتركه مفعل تقنياً ليتمكن من رؤية الـ Toast عند الضغط
-                startBtn.style.opacity = "0.6";
-                startBtn.innerText = `في انتظار اللاعبين (${slottedPlayersCount}/${localSettings.players})`;
-            }
-        }
-    }
+    // 🟢 استبدال كل كود زر البدء الطويل بالسطر التالي:
+    updateStartButtonText(players, localSettings);
     
     const settingsPanel = document.querySelector('.settings-panel');
     if (settingsPanel) {
@@ -1082,7 +1066,37 @@ onValue(playersRef, (snapshot) => {
 });
 
 /* ---------- 7. Game Engine & Start ---------- */
-// دالة إنشاء مصفوفة الأوراق
+function updateStartButtonText(playersData, settings) {
+    const startBtn = document.getElementById('startBtn');
+    if (!startBtn || !isAdmin) return;
+
+    startBtn.style.display = 'block';
+
+    const playerList = Object.values(playersData || {});
+    const requiredPlayers = settings.players; // العدد المحدد الحالي (مثلاً 5)
+
+    // 🟢 التعديل هنا: نحسب فقط اللاعبين الذين في سلوتات صالحة وأصغر من العدد الأقصى
+    const slottedPlayersCount = playerList.filter(p => {
+        if (p.slot && p.slot.startsWith('slot-')) {
+            const slotIndex = parseInt(p.slot.split('-')[1]);
+            return slotIndex < requiredPlayers; // إذا كان السلوت 5 والحد 5، يُستبعد لأن السلوتات تبدأ من 0 إلى 4
+        }
+        return false;
+    }).length;
+
+    const isFull = slottedPlayersCount === requiredPlayers;
+
+    if (isFull) {
+        startBtn.disabled = false;
+        startBtn.style.opacity = "1";
+        startBtn.style.cursor = "pointer";
+        startBtn.innerText = "ابدأ اللعبة الآن";
+    } else {
+        startBtn.disabled = false; 
+        startBtn.style.opacity = "0.6";
+        startBtn.innerText = `في انتظار اللاعبين (${slottedPlayersCount}/${requiredPlayers})`;
+    }
+}
 function createUnoDeck(numDecks = 1, includeEraser = false) {
     const colors = ["red", "blue", "green", "yellow"];
     const numbers = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
@@ -1178,7 +1192,6 @@ window.handleStartGame = async function() {
     let firstCard;
     while (true) {
         firstCard = deck.pop();
-        // إذا كانت +4 أو +2 أو ماسح، نعيدها لأسفل الكومة ونسحب غيرها
         if (firstCard === "wildDrawFour" || firstCard.includes("DrawTwo") || firstCard === "Eraser") {
             deck.unshift(firstCard); 
         } else {
@@ -1186,7 +1199,6 @@ window.handleStartGame = async function() {
         }
     }
 
-    // 4. معالجة تأثير البطاقة الأولى على حالة اللعب
     let initialDirection = 1; // 1 = عادي، -1 = عكسي
     let startingPlayerIndex = 0; // افتراضياً يبدأ اللاعب صاحب Slot-0
     let initialDrawStack = 0;
@@ -1194,13 +1206,9 @@ window.handleStartGame = async function() {
     // حالة بطاقة العكس (Reverse) كأول بطاقة
     if (firstCard.includes("Reverse")) {
         initialDirection = -1;
-        // في أونو الرسمية، إذا كانت العكس هي الأولى، يبدأ صاحب المركز الأخير (أو العكس)
-        // لكن هنا سنعكس الاتجاه فقط ونبدأ من اللاعب الأول في الاتجاه الجديد
     }
 
-    // حالة بطاقة التخطي (Skip) كأول بطاقة
     if (firstCard.includes("Skip")) {
-        // يتم تخطي اللاعب الأول (Index 0) لينتقل الدور للاعب التالي فوراً
         startingPlayerIndex = (0 + initialDirection + activePlayers.length) % activePlayers.length;
     }
 
