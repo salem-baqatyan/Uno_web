@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="img/logo.png">
-    <title>UNO! Pro - Playing</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="UNO! Pro">
+    <title>UNO! Pro - Game</title>
     <style>
         /* --- الأساسيات --- */
         :root {
@@ -276,7 +279,7 @@
 <script src="/strings/seat_positions.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, update, onValue, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+import { getDatabase, ref, update, onValue, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
     authDomain: "uno-4ed20.firebaseapp.com",
@@ -293,6 +296,21 @@ const db = getDatabase(app);
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
 const playerId = urlParams.get('p');
+
+// مراجع السيرفر الخاصة باللاعب الحالي
+const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+
+// 1. عند انقطاع الاتصال فجأة، يسجل السيرفر البصمة الزمنية
+onDisconnect(myPlayerRef).update({
+    isDisconnected: true,
+    disconnectTime: serverTimestamp()
+});
+
+// 2. بمجرد الدخول أو تحديث الصفحة بنجاح، يتم إلغاء حالة الانقطاع
+update(myPlayerRef, {
+    isDisconnected: false,
+    disconnectTime: null
+});
 
 const gameRef = ref(db, `rooms/${roomId}/game`);
 const playersRef = ref(db, `rooms/${roomId}/players`);
@@ -674,8 +692,32 @@ document.getElementById('deckPile').onclick = async () => {
 
 onValue(playersRef, (snap) => {
     playersData = snap.val() || {};
-    activePlayersList = Object.values(playersData).filter(p => p.slot?.startsWith('slot-')).sort((a, b) => parseInt(a.slot.split('-')[1]) - parseInt(b.slot.split('-')[1]));
+    activePlayersList = Object.values(playersData)
+        .filter(p => p.slot?.startsWith('slot-'))
+        .sort((a, b) => parseInt(a.slot.split('-')[1]) - parseInt(b.slot.split('-')[1]));
+        
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
+    
+    // --- المحرك السيرفري الذكي لفحص المنقطعين ---
+    if (gameState && gameState.status !== 'finished') {
+        const now = Date.now();
+        
+        // من يملك الصلاحية؟ الأدمن فقط (أول لاعب في القائمة)
+        const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
+        
+        activePlayersList.forEach(p => {
+            if (p.isDisconnected && p.disconnectTime) {
+                const elapsed = Math.floor((now - p.disconnectTime) / 1000);
+                
+                // إذا تجاوز 30 ثانية والأدمن متواجد، يتخذ القرار
+                if (elapsed >= 30 && isAdmin) {
+                    handleLeaverLogic(p.id);
+                }
+            }
+        });
+    }
+    // ---------------------------------------------
+
     renderGame();
 });
 
@@ -751,18 +793,36 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
     // جلب نمط التوزيع المناسب لعدد اللاعبين
     const activeConfig = seatPositions[count] || seatPositions[2];
     // 3. رسم اللاعبين بناءً على الترتيب الفعلي للسلوت
+// 3. رسم اللاعبين بناءً على الترتيب الفعلي للسلوت
     playersArray.forEach((p, i) => {
         const pos = activeConfig[i];
-        if (!pos) return; // حماية في حال عدم توفر موقع
+        if (!pos) return; 
 
         const seat = document.createElement('div');
         
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
         const isFinished = p.finishedRank ? 'finished-player' : '';
         
-        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished}`;
+        // --- معالجة مظهر العداد والانقطاع ---
+        let disconnectClass = '';
+        let timerHTML = '';
         
-        // تطبيق التموضع الدقيق
+        if (p.isDisconnected && p.disconnectTime) {
+            disconnectClass = 'is-disconnected-gray'; // يضاف في الـ CSS
+            
+            // حساب الوقت المتبقي بناءً على توقيت السيرفر
+            const now = Date.now();
+            const elapsed = Math.floor((now - p.disconnectTime) / 1000);
+            const timeLeft = Math.max(0, 30 - elapsed);
+            
+            if (timeLeft > 0) {
+                timerHTML = `<div class="disconnect-timer">${timeLeft}</div>`;
+            }
+        }
+        // -------------------------------------
+        
+        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${disconnectClass}`;
+        
         if (pos.side === 'left') {
             seat.style.cssText = `top: ${pos.top}%; left: ${pos.left}px; transform: translateY(-50%);`;
         } else if (pos.side === 'right') {
@@ -775,6 +835,7 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
             <div class="avatar-wrap" onclick="handleChallenge('${p.id}')">
                 <img src="${p.avatar}">
                 <div class="card-count-badge ${isUnoDanger}">${p.handCount || 0}</div>
+                ${timerHTML}
             </div>
             <div class="player-name">${p.name}${p.id === myId ? ' <span class="me-tag">(أنت)</span>' : ''}</div>
         `;
@@ -783,6 +844,44 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 
     document.getElementById('playerCount').innerText = count;
 };
+async function handleLeaverLogic(leaverId) {
+    const updates = {};
+    const leaver = playersData[leaverId];
+    if (!leaver || leaver.team === "spectators-list") return; 
+
+    let deck = [...(gameState.deck || [])];
+    const leaverHand = leaver.hand || [];
+
+    // 1. أخذ بطاقات المنسحب ووضعها أسفل الكومة
+    deck = leaverHand.concat(deck);
+    updates[`rooms/${roomId}/game/deck`] = deck;
+
+    // 2. إرجاعه للجمهور
+    updates[`rooms/${roomId}/players/${leaverId}/team`] = "spectators-list";
+    updates[`rooms/${roomId}/players/${leaverId}/slot`] = null;
+    updates[`rooms/${roomId}/players/${leaverId}/hand`] = null;
+    updates[`rooms/${roomId}/players/${leaverId}/handCount`] = 0;
+    updates[`rooms/${roomId}/players/${leaverId}/finishedRank`] = 999; // يظهر أخير بالترتيب
+    updates[`rooms/${roomId}/players/${leaverId}/isLeaver`] = true;
+
+    // 4. فحص اللاعبين المتبقين (إذا بقي لاعب واحد فقط يفوز تلقائياً وتنتهي اللعبة)
+    const remainingPlayers = activePlayersList.filter(p => p.id !== leaverId && !p.finishedRank);
+    
+    if (remainingPlayers.length === 1) {
+        updates[`rooms/${roomId}/game/status`] = 'finished';
+        updates[`rooms/${roomId}/players/${remainingPlayers[0].id}/finishedRank`] = 1;
+    } else {
+        // 5. إذا كان عليه الدور، نقل الدور والتراكم للغريم القادم
+        if (gameState.turnState.currentTurnId === leaverId) {
+            let nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
+            updates[`rooms/${roomId}/game/turnState/currentTurnId`] = nextPlayerId;
+            updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
+        }
+    }
+
+    await update(ref(db), updates);
+    showToast(`🚫 اللاعب ${leaver.name} انسحب لقطع الاتصال!`);
+}
 window.handleChallenge = async function(targetId) {
     if (targetId === playerId) return; 
 
@@ -906,21 +1005,24 @@ window.showLeaderboard = function() {
         // ترتيب تصاعدي: صاحب النقاط الأقل هو الأول
         sortedPlayers.sort((a, b) => a.points - b.points);
         
-        // رسم الجدول
+// رسم الجدول
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
-            const rowClass = isMe ? 'is-me-row' : '';
+            const isLeaver = playersData[p.id]?.isLeaver; // منسحب؟
+            
+            const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
-            const rankText = rankNames[idx] || (idx + 1);
+            const rankText = isLeaver ? 'منسحب' : (rankNames[idx] || (idx + 1));
+            const movesText = isLeaver ? '--' : `${p.movesCount} دور`;
             
             tbody.innerHTML += `
                 <tr class="${rowClass}">
                     <td>${rankText}</td>
                     <td>${playerName}</td>
-                    <td>${p.points} نقطة</td>
+                    <td>${movesText}</td>
                 </tr>`;
         });
-
+        
     } else {
         // ==========================================
         // --- 2. النظام التتابعي ---
