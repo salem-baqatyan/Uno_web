@@ -381,35 +381,53 @@
         }
     };
 
-    window.createRoom = async () => {
-        const dbRef = ref(db);
-        let newId = "";
-        let isUnique = false;
+window.createRoom = async () => {
+    const dbRef = ref(db);
+    let newId = "";
+    let isUnique = false;
 
-        const createBtn = document.querySelector('.btn-outline');
-        createBtn.innerText = "جاري الحجز...";
-        createBtn.disabled = true;
+    const createBtn = document.querySelector('.btn-outline');
+    createBtn.innerText = "جاري الحجز...";
+    createBtn.disabled = true;
 
-        while (!isUnique) {
-            newId = Math.random().toString(36).substring(2, 8).toUpperCase();
-            const snapshot = await get(child(dbRef, `rooms/${newId}`));
-            if (!snapshot.exists()) isUnique = true;
-        }
+    while (!isUnique) {
+        newId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const snapshot = await get(child(dbRef, `rooms/${newId}`));
+        if (!snapshot.exists()) isUnique = true;
+    }
 
-        const selectedType = document.querySelector('input[name="roomType"]:checked').value;
+    const selectedType = document.querySelector('input[name="roomType"]:checked').value;
 
-        try {
-            await set(ref(db, `rooms/${newId}/settings`), {
+    let playerId = localStorage.getItem('uno_playerId');
+    if (!playerId) {
+        playerId = Math.random().toString(36).substring(2, 8);
+        localStorage.setItem('uno_playerId', playerId);
+    }
+
+    try {
+        await set(ref(db, `rooms/${newId}`), {
+            status: "lobby", 
+            lastActivity: Date.now(),
+            creatorId: playerId,
+            settings: {
                 visibility: selectedType,
                 points: false,
+                cards: 7, 
+                decks: 1,
+                eraser: false,
+                players: 2,
+                stacking: true,
+                timer: 0,
                 createdAt: Date.now() 
-            });
-            location.href = `lobby.html?r=${newId}&type=${selectedType}`;
-        } catch (e) {
-            showToast("❌ فشل إنشاء الغرفة");
-            createBtn.disabled = false; createBtn.innerText = "إنشاء غرفة";
-        }
-    };
+            }
+        });
+        
+        location.href = `lobby.html?r=${newId}`;
+    } catch (e) {
+        showToast("❌ فشل إنشاء الغرفة");
+        createBtn.disabled = false; createBtn.innerText = "إنشاء غرفة";
+    }
+};
 
     const roomsQuery = query(ref(db, 'rooms'), orderByChild('settings/createdAt'), limitToLast(20));
     
@@ -460,6 +478,5 @@
         }
     });
 </script>
-
 </body>
 </html>

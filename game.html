@@ -280,6 +280,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getDatabase, ref, update, onValue, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
     authDomain: "uno-4ed20.firebaseapp.com",
@@ -297,16 +298,13 @@ const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
 const playerId = urlParams.get('p');
 
-// مراجع السيرفر الخاصة باللاعب الحالي
 const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
 
-// 1. عند انقطاع الاتصال فجأة، يسجل السيرفر البصمة الزمنية
 onDisconnect(myPlayerRef).update({
     isDisconnected: true,
     disconnectTime: serverTimestamp()
 });
 
-// 2. بمجرد الدخول أو تحديث الصفحة بنجاح، يتم إلغاء حالة الانقطاع
 update(myPlayerRef, {
     isDisconnected: false,
     disconnectTime: null
@@ -347,7 +345,6 @@ function createCardElement(cardStr, zIndex, onClickAction) {
     return div;
 }
 
-// دالة خلط المصفوفة
 function shuffleArray(array) {
     let newArr = [...array];
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -357,7 +354,6 @@ function shuffleArray(array) {
     return newArr;
 }
 
-// دالة سحب البطاقات مع معالجة إعادة الخلط
 function extractCardsToDraw(count, currentDeck, currentDiscard) {
     let drawnCards = [];
     let deck = [...(currentDeck || [])];
@@ -365,7 +361,7 @@ function extractCardsToDraw(count, currentDeck, currentDiscard) {
 
     for (let i = 0; i < count; i++) {
         if (deck.length === 0) {
-            if (discard.length <= 1) break; // لا يوجد بطاقات كافية للخلط
+            if (discard.length <= 1) break;
             const topCard = discard.pop();
             deck = shuffleArray(discard);
             discard = [topCard];
@@ -379,26 +375,21 @@ function applyDynamicMargins() {
     const cards = document.querySelectorAll("#myHand .card");
     const count = cards.length;
     
-    // إذا لم يكن هناك بطاقات أو بطاقة واحدة
     if (count <= 1) {
         if (cards[0]) cards[0].style.margin = "0";
         return;
     }
 
     const cardWidth = 65;
-    const targetDistance = 425; // المرجع الثابت
+    const targetDistance = 425;
     let idealMargin = 0;
 
-    // الشرط المحدث بناءً على رغبتك
     if (count <= 17) {
-        // إذا كان عدد البطاقات 17 أو أقل، نثبت الهامش على القيمة التي حددتها
         idealMargin = -21.4;
     } else {
-        // إذا زاد العدد عن 17، تعمل المعادلة المرنة لتقليص المساحة
         idealMargin = (targetDistance - (count * cardWidth)) / ((count - 1) * 2);
     }
 
-    // تطبيق الهامش على جميع البطاقات
     cards.forEach(card => {
         card.style.marginLeft = `${idealMargin}px`;
         card.style.marginRight = `${idealMargin}px`;
@@ -429,10 +420,10 @@ function renderGame() {
         const action = (currentTurnId === playerId) ? () => handlePlayCard(cardStr, index) : null;
         handContainer.appendChild(createCardElement(cardStr, index + 1, action));
     });
-    // إظهار التراكم إذا كان مفعلاً
+
     const stackingAlert = document.getElementById('stackingAlert');
     const drawStack = gameState.turnState.drawStack || 0;
-const isStackingEnabled = roomSettings.stacking !== false; // يقرأ من الإعدادات الصحيحة
+    const isStackingEnabled = roomSettings.stacking !== false;
 
     if (currentTurnId === playerId && drawStack > 0 && isStackingEnabled) {
         stackingAlert.style.display = 'flex';
@@ -441,7 +432,6 @@ const isStackingEnabled = roomSettings.stacking !== false; // يقرأ من ال
         stackingAlert.style.display = 'none';
     }
     applyDynamicMargins();
-
 }
 
 window.selectColor = function(color) {
@@ -458,17 +448,14 @@ function getNextPlayerId(skip, currentDirection) {
     let targetCount = skip ? 2 : 1;
     let nextIdx = idx;
     
-    // البحث عن اللاعب القادم مع تخطي من انتهت أوراقه
     while (foundCount < targetCount) {
         nextIdx = (nextIdx + currentDirection) % activePlayersList.length;
         if (nextIdx < 0) nextIdx += activePlayersList.length;
         
-        // إذا اللاعب لم ينهي بطاقاته، نعتبره موجوداً
         if (!activePlayersList[nextIdx].finishedRank) {
             foundCount++;
         }
         
-        // أمان لتجنب Loop لا نهائي في حال بقي لاعب واحد فقط
         if (nextIdx === idx) break; 
     }
     return activePlayersList[nextIdx].id;
@@ -481,20 +468,17 @@ function isValidMove(playedStr) {
     const activeCol = gameState.turnState.selectedColor || top.color;
     const drawStack = gameState.turnState.drawStack || 0;
 
-    // --- تعديل شرط بطاقة الماسح لتكون دفاعية فقط ---
     if (played.isEraser) {
         return drawStack > 0;
     }
 
-    // إذا كان هناك تراكم، يجب الرد بـ +2 أو +4 أو الماسح (الذي عالجناه في الشرط الأعلى)
     if (drawStack > 0) {
         return (played.value === "+2" || played.value === "+4");
     }
-    // ------------------------------------------------
 
-    // اللعب الطبيعي: لا يمكن لعب الماسح هنا أبداً
     return played.isWild || played.color === activeCol || played.value === top.value;
 }
+
 async function handlePlayCard(cardStr, cardIndex) {
     if (!isValidMove(cardStr)) return alert("لا يمكنك لعب هذه البطاقة!");
 
@@ -510,25 +494,22 @@ async function handlePlayCard(cardStr, cardIndex) {
 async function executeMove(cardStr, cardIndex, chosenColor) {
     const card = parseCard(cardStr);
     
-    // --- القاعدة الجديدة: منع الفوز ببطاقة أكشن ---
-    const isActionCard = card.value === "⊘" || // تخطي
-                         card.value === "↻" || // عكس
-                         card.value === "+2" || // سحب 2
-                         card.value === "+4" || // سحب 4
-                         card.type === "wildColor" || // تغيير لون
-                         card.isEraser; // الماسح
+    const isActionCard = card.value === "⊘" || 
+                         card.value === "↻" || 
+                         card.value === "+2" || 
+                         card.value === "+4" || 
+                         card.type === "wildColor" || 
+                         card.isEraser;
 
     if (myHand.length === 1 && isActionCard) {
         return showToast("🚫يجب أن تكون بطاقتك الأخيرة رقماً.");
     }
-    // ------------------------------------------
 
     let nextDirection = gameState.turnState.direction;
     let skipNext = false;
     let addedStack = 0;
     const isStackingEnabled = roomSettings.stacking !== false;
 
-    // 1. تحديد عدد اللاعبين الذين لم ينتهوا بعد
     const playersStillPlaying = activePlayersList.filter(p => !p.finishedRank).length;
 
     let newDrawStack = (gameState.turnState.drawStack || 0);
@@ -553,20 +534,17 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
         newDrawStack += addedStack;
     }
 
-    // تحديد اللاعب القادم
     let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
     
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
     
-    // تنفيذ اللعب
     myHand.splice(cardIndex, 1);
     
     const isPointsMode = roomSettings.points === true;
     let isGameOver = false;
     let myRank = null;
 
-    // الفوز مسموح فقط الآن لأننا تأكدنا أنها ليست بطاقة أكشن
     if (myHand.length === 0) {
         if (isPointsMode) {
             isGameOver = true;
@@ -590,7 +568,6 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
 
     if (myRank) updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
 
-    // معالجة السحب المباشر
     if (addedStack > 0 && !isStackingEnabled) {
         const targetPlayerId = getNextPlayerId(false, nextDirection); 
         const drawRes = extractCardsToDraw(newDrawStack, deck, discardPile);
@@ -617,19 +594,21 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     if (isGameOver) {
         updates[`rooms/${roomId}/game/status`] = 'finished';
     } else {
+        const timerSetting = parseInt(roomSettings.timer) || 0;
+        const nextExpireAt = timerSetting > 0 ? (Date.now() + (timerSetting * 1000)) : null;
+
         updates[`rooms/${roomId}/game/turnState`] = {
             currentTurnId: nextPlayerId, 
             direction: nextDirection, 
             selectedColor: chosenColor,
             drawStack: newDrawStack, 
-            lastUpdated: serverTimestamp()
+            lastUpdated: serverTimestamp(),
+            expireAt: nextExpireAt // 👈 تحديث وقت اللاعب القادم
         };
     }
-
     await update(ref(db), updates);
 }
 
-// دالة قبول التراكم والسحب (مربوطة بالزر الأحمر)
 window.acceptDrawStack = async function() {
     if (gameState.turnState.currentTurnId !== playerId) return;
     const drawCount = gameState.turnState.drawStack;
@@ -647,20 +626,22 @@ window.acceptDrawStack = async function() {
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
     
-    // --- السطر الجديد هنا ---
     updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false;
 
     const currentMoves = playersData[playerId].movesCount || 0;
     updates[`rooms/${roomId}/players/${playerId}/movesCount`] = currentMoves + 1;
     
+    const timerSetting = parseInt(roomSettings.timer) || 0;
+    const nextExpireAt = timerSetting > 0 ? (Date.now() + (timerSetting * 1000)) : null;
+
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
     updates[`rooms/${roomId}/game/turnState/drawStack`] = 0;
     updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
+    updates[`rooms/${roomId}/game/turnState/expireAt`] = nextExpireAt; // 👈 هنا
 
     await update(ref(db), updates);
 };
 
-// السحب العادي مع الخلط التلقائي
 document.getElementById('deckPile').onclick = async () => {
     if (gameState.turnState.currentTurnId !== playerId) return alert("ليس دورك!");
     if (gameState.turnState.drawStack > 0) return alert("اضغط على (اسحب وتخطي الدور) لإنهاء التراكمات!");
@@ -679,14 +660,17 @@ document.getElementById('deckPile').onclick = async () => {
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
     
-    // --- السطر الجديد هنا ---
     updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false;
 
     const currentMoves = playersData[playerId].movesCount || 0;
     updates[`rooms/${roomId}/players/${playerId}/movesCount`] = currentMoves + 1;
     
+    const timerSetting = parseInt(roomSettings.timer) || 0;
+    const nextExpireAt = timerSetting > 0 ? (Date.now() + (timerSetting * 1000)) : null;
+
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
-    
+    updates[`rooms/${roomId}/game/turnState/expireAt`] = nextExpireAt; // 👈 هنا
+
     await update(ref(db), updates);
 };
 
@@ -698,52 +682,144 @@ onValue(playersRef, (snap) => {
         
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
     
-    // --- المحرك السيرفري الذكي لفحص المنقطعين ---
     if (gameState && gameState.status !== 'finished') {
         const now = Date.now();
         
-        // من يملك الصلاحية؟ الأدمن فقط (أول لاعب في القائمة)
         const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
         
         activePlayersList.forEach(p => {
             if (p.isDisconnected && p.disconnectTime) {
                 const elapsed = Math.floor((now - p.disconnectTime) / 1000);
                 
-                // إذا تجاوز 30 ثانية والأدمن متواجد، يتخذ القرار
                 if (elapsed >= 30 && isAdmin) {
                     handleLeaverLogic(p.id);
                 }
             }
         });
     }
-    // ---------------------------------------------
 
     renderGame();
 });
 
-onValue(gameRef, (snap) => {
-    gameState = snap.val();
-    // إذا انتهت اللعبة، نعرض اللوحة بدلاً من تحديث الطاولة
-    if (gameState && gameState.status === 'finished') {
-        showLeaderboard();
-    } else {
-        renderGame();
-    }
-});
+let gameTimerInterval = null;
+
 onValue(settingsRef, (snap) => {
     roomSettings = snap.val() || {};
 });
-// دالة إظهار الإشعارات على الشاشة
+onValue(gameRef, (snap) => {
+    gameState = snap.val();
+    if (!gameState) return;
+
+    if (gameState.status === 'finished') {
+        if (gameTimerInterval) clearInterval(gameTimerInterval);
+        document.getElementById('gameTimer').innerText = ''; // تصفير التايمر
+        showLeaderboard();
+    } else {
+        renderGame();
+        
+        // ⏱️ تشغيل مؤقت الدور إذا كان مفعل في الإعدادات
+        const timerSetting = parseInt(roomSettings.timer) || 0;
+        if (timerSetting > 0 && gameState.turnState && gameState.turnState.expireAt) {
+            startTurnTimer(gameState.turnState.expireAt);
+        } else {
+            if (gameTimerInterval) clearInterval(gameTimerInterval);
+            document.getElementById('gameTimer').innerText = '∞'; // لعب حر
+        }
+    }
+});
+
+// دالة المؤقت التنازلي المرئي والآلي
+function startTurnTimer(expireAt) {
+    if (gameTimerInterval) clearInterval(gameTimerInterval);
+    const timerElement = document.getElementById('gameTimer');
+
+    gameTimerInterval = setInterval(async () => {
+        const now = Date.now();
+        const timeLeft = Math.ceil((expireAt - now) / 1000);
+
+        if (timeLeft > 0) {
+            timerElement.innerText = `${timeLeft}ث`;
+            // تلوين التايمر بالأحمر عند اقتراب انتهاء الوقت
+            if (timeLeft <= 5) {
+                timerElement.style.color = '#ff4d4d';
+                timerElement.style.fontWeight = 'bold';
+            } else {
+                timerElement.style.color = 'white';
+                timerElement.style.fontWeight = 'normal';
+            }
+        } else {
+            // انتهى الوقت ⏳
+            clearInterval(gameTimerInterval);
+            timerElement.innerText = `0ث`;
+            
+            // الآدمن فقط هو الذي ينفذ الحركة لعدم تكرار السحب في الـ Database
+            const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
+            if (isAdmin) {
+                await handleTimeoutPenalty(gameState.turnState.currentTurnId);
+            }
+        }
+    }, 1000);
+}
+
+// دالة معاقبة اللاعب الذي انتهى وقته
+async function handleTimeoutPenalty(timedOutPlayerId) {
+    let deck = [...(gameState.deck || [])];
+    let discardPile = [...(gameState.discardPile || [])];
+    const timedOutPlayer = playersData[timedOutPlayerId];
+    
+    if (!timedOutPlayer) return;
+
+    const currentHand = timedOutPlayer.hand || [];
+    
+    // سحب بطاقة واحدة
+    const drawRes = extractCardsToDraw(1, deck, discardPile);
+    if (drawRes.drawnCards.length === 0) return; // الكوتشينة انتهت
+    
+    const newHand = currentHand.concat(drawRes.drawnCards);
+    const updates = {};
+    
+    updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
+    updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
+    updates[`rooms/${roomId}/players/${timedOutPlayerId}/hand`] = newHand;
+    updates[`rooms/${roomId}/players/${timedOutPlayerId}/handCount`] = newHand.length;
+    updates[`rooms/${roomId}/players/${timedOutPlayerId}/saidUno`] = false;
+    
+    const currentMoves = timedOutPlayer.movesCount || 0;
+    updates[`rooms/${roomId}/players/${timedOutPlayerId}/movesCount`] = currentMoves + 1;
+
+    // تجهيز الوقت للّاعب القادم بناءً على الخيار
+    const timerSetting = parseInt(roomSettings.timer) || 0;
+    const nextExpireAt = timerSetting > 0 ? (Date.now() + (timerSetting * 1000)) : null;
+
+    // تخطي دوره ونقله للاعب التالي
+    const nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
+    updates[`rooms/${roomId}/game/turnState`] = {
+        currentTurnId: nextPlayerId,
+        direction: gameState.turnState.direction,
+        selectedColor: gameState.turnState.selectedColor || null,
+        drawStack: gameState.turnState.drawStack || 0,
+        lastUpdated: serverTimestamp(),
+        expireAt: nextExpireAt // 👈 تحديد انتهاء وقت اللاعب القادم
+    };
+
+    // إرسال رسالة تخطى بالتوست للجميع
+    updates[`rooms/${roomId}/game/toastMessage`] = { 
+        msg: `⏰ انتهى وقت ${timedOutPlayer.name} وتم سحب بطاقة له!`, 
+        time: Date.now() 
+    };
+
+    await update(ref(db), updates);
+}
+
 window.showToast = function(msg) {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
     toast.className = 'toast-msg';
     toast.innerText = msg;
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000); // يختفي بعد 4 ثوانٍ
+    setTimeout(() => toast.remove(), 4000);
 };
 
-// الاستماع للإشعارات القادمة من السيرفر (للجميع)
 let lastToastTime = 0;
 onValue(ref(db, `rooms/${roomId}/game/toastMessage`), (snap) => {
     const data = snap.val();
@@ -753,47 +829,38 @@ onValue(ref(db, `rooms/${roomId}/game/toastMessage`), (snap) => {
     }
 });
 
-// برمجة زر UNO
-// برمجة زر UNO المحدثة
 document.querySelector('.uno-btn').onclick = async () => {
-    // 1. التأكد أن الدور دوري
     if (gameState.turnState.currentTurnId !== playerId) {
         return showToast("لا يمكنك قول UNO إلا عندما يكون الدور لك!");
     }
 
-    // 2. التأكد من عدد البطاقات (يجب أن يكون 2 لكي تصبح 1 بعد اللعب)
     if (myHand.length !== 2) {
         return showToast("تضغط UNO فقط عندما يتبقى معك بطاقتين وستلعب إحداهما!");
     }
 
-    // 3. التأكد أنه لم يضغط الزر مسبقاً في هذا الدور
     if (playersData[playerId].saidUno === true) {
         return showToast("لقد أعلنت UNO بالفعل لهذا الدور!");
     }
 
-    // تنفيذ العملية
     await update(ref(db, `rooms/${roomId}/players/${playerId}`), { saidUno: true });
     await update(ref(db, `rooms/${roomId}/game/toastMessage`), { 
         msg: `🗣️ ${playersData[playerId].name} قال UNO!`, 
         time: Date.now() 
     });
 };
+
 window.layoutPlayers = function(playersData, myId, currentTurnId) {
     const container = document.getElementById('playersContainer');
     container.innerHTML = '';
     
-    // 1. جلب اللاعبين وترتيبهم حسب السلوت (الترتيب البرمجي الثابت)
     const playersArray = Object.values(playersData)
         .filter(p => p.slot?.startsWith('slot-'))
         .sort((a, b) => parseInt(a.slot.split('-')[1]) - parseInt(b.slot.split('-')[1]));
 
     const count = playersArray.length;
     
-    // 2. مصفوفة المواقع بناءً على صورتك التوضيحية (النسب المئوية)
-    // جلب نمط التوزيع المناسب لعدد اللاعبين
     const activeConfig = seatPositions[count] || seatPositions[2];
-    // 3. رسم اللاعبين بناءً على الترتيب الفعلي للسلوت
-// 3. رسم اللاعبين بناءً على الترتيب الفعلي للسلوت
+    
     playersArray.forEach((p, i) => {
         const pos = activeConfig[i];
         if (!pos) return; 
@@ -803,14 +870,12 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
         const isFinished = p.finishedRank ? 'finished-player' : '';
         
-        // --- معالجة مظهر العداد والانقطاع ---
         let disconnectClass = '';
         let timerHTML = '';
         
         if (p.isDisconnected && p.disconnectTime) {
-            disconnectClass = 'is-disconnected-gray'; // يضاف في الـ CSS
+            disconnectClass = 'is-disconnected-gray';
             
-            // حساب الوقت المتبقي بناءً على توقيت السيرفر
             const now = Date.now();
             const elapsed = Math.floor((now - p.disconnectTime) / 1000);
             const timeLeft = Math.max(0, 30 - elapsed);
@@ -819,7 +884,6 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
                 timerHTML = `<div class="disconnect-timer">${timeLeft}</div>`;
             }
         }
-        // -------------------------------------
         
         seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${disconnectClass}`;
         
@@ -844,6 +908,7 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 
     document.getElementById('playerCount').innerText = count;
 };
+
 async function handleLeaverLogic(leaverId) {
     const updates = {};
     const leaver = playersData[leaverId];
@@ -852,26 +917,22 @@ async function handleLeaverLogic(leaverId) {
     let deck = [...(gameState.deck || [])];
     const leaverHand = leaver.hand || [];
 
-    // 1. أخذ بطاقات المنسحب ووضعها أسفل الكومة
     deck = leaverHand.concat(deck);
     updates[`rooms/${roomId}/game/deck`] = deck;
 
-    // 2. إرجاعه للجمهور
     updates[`rooms/${roomId}/players/${leaverId}/team`] = "spectators-list";
     updates[`rooms/${roomId}/players/${leaverId}/slot`] = null;
     updates[`rooms/${roomId}/players/${leaverId}/hand`] = null;
     updates[`rooms/${roomId}/players/${leaverId}/handCount`] = 0;
-    updates[`rooms/${roomId}/players/${leaverId}/finishedRank`] = 999; // يظهر أخير بالترتيب
+    updates[`rooms/${roomId}/players/${leaverId}/finishedRank`] = 999;
     updates[`rooms/${roomId}/players/${leaverId}/isLeaver`] = true;
 
-    // 4. فحص اللاعبين المتبقين (إذا بقي لاعب واحد فقط يفوز تلقائياً وتنتهي اللعبة)
     const remainingPlayers = activePlayersList.filter(p => p.id !== leaverId && !p.finishedRank);
     
     if (remainingPlayers.length === 1) {
         updates[`rooms/${roomId}/game/status`] = 'finished';
         updates[`rooms/${roomId}/players/${remainingPlayers[0].id}/finishedRank`] = 1;
     } else {
-        // 5. إذا كان عليه الدور، نقل الدور والتراكم للغريم القادم
         if (gameState.turnState.currentTurnId === leaverId) {
             let nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
             updates[`rooms/${roomId}/game/turnState/currentTurnId`] = nextPlayerId;
@@ -882,21 +943,19 @@ async function handleLeaverLogic(leaverId) {
     await update(ref(db), updates);
     showToast(`🚫 اللاعب ${leaver.name} انسحب لقطع الاتصال!`);
 }
+
 window.handleChallenge = async function(targetId) {
     if (targetId === playerId) return; 
 
-    // 1. القيد الأول: يجب أن يكون الدور دورك لتعترض
     if (gameState.turnState.currentTurnId !== playerId) {
         return showToast("يمكنك تقديم اعتراض فقط عندما يكون الدور لك!");
     }
 
-    // 2. القيد الثاني: الاعتراض فقط على من لديه بطاقة واحدة
     const targetPlayer = playersData[targetId];
     if (targetPlayer.handCount !== 1) {
         return showToast("يمكنك الاعتراض فقط على اللاعب الذي يملك بطاقة واحدة!");
     }
 
-    // 3. فتح النافذة للتأكيد
     const isSure = await openChallengeModal(targetPlayer.name);
     if (!isSure) return;
 
@@ -905,9 +964,7 @@ window.handleChallenge = async function(targetId) {
     const updates = {};
     let drawRes;
 
-    // منطق التحقق من قول UNO
     if (targetPlayer.saidUno === true) {
-        // اعتراض خاطئ -> عقاب للمعتَرِض (بطاقة واحدة)
         drawRes = extractCardsToDraw(1, deck, discardPile);
         myHand = myHand.concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
@@ -918,7 +975,6 @@ window.handleChallenge = async function(targetId) {
             time: Date.now() 
         };
     } else {
-        // اعتراض صحيح -> عقاب للمخطئ (بطاقتين)
         drawRes = extractCardsToDraw(2, deck, discardPile);
         let targetHand = (targetPlayer.hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetId}/hand`] = targetHand;
@@ -934,47 +990,45 @@ window.handleChallenge = async function(targetId) {
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     await update(ref(db), updates);
 };
-let challengeResolver = null; // متغير لحفظ الرد
+
+let challengeResolver = null;
 
 window.openChallengeModal = function(targetName) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('challengeModal');
         document.getElementById('challengeText').innerText = `هل أنت متأكد من تقديم اعتراض ضد (${targetName})\n\n بأنه لم يضغط زر UNO؟\n\nستُعاقب بسحب بطاقة إذا كان قد ضغط الزر فعلاً!`;
         overlay.style.display = 'flex';
-        challengeResolver = resolve; // نعلق الرد حتى يضغط المستخدم زر
+        challengeResolver = resolve;
     });
 };
 
 window.closeChallengeModal = function(result) {
     document.getElementById('challengeModal').style.display = 'none';
     if (challengeResolver) {
-        challengeResolver(result); // نرسل النتيجة (true أو false)
+        challengeResolver(result);
         challengeResolver = null;
     }
 };
-// 1. تحديث دالة حساب النقاط بدقة حسب معاييرك
+
 function calculateHandPoints(hand) {
     let total = 0;
     if (!hand || !Array.isArray(hand)) return 0;
     
     hand.forEach(cardStr => {
         const c = parseCard(cardStr);
-        // بطاقات الجوكر (تغيير لون، +4، والماسح) تعطي 50 نقطة
         if (c.isWild || c.isEraser || cardStr === "wildColor" || cardStr === "wildDrawFour") {
             total += 50;
         } 
-        // بطاقات الأكشن (+2، عكس، تخطي) تعطي 20 نقطة
         else if (["⊘", "↻", "+2"].includes(c.value) || c.value === "+2") {
             total += 20;
         } 
-        // بطاقات الأرقام تعطي قيمتها المكتوبة
         else if (!isNaN(parseInt(c.value))) {
             total += parseInt(c.value);
         }
     });
     return total;
 }
-// متغير لحفظ العداد حتى لا يتداخل إذا تم استدعاء الدالة مرتين
+
 let leaderboardInterval = null; 
 
 window.showLeaderboard = function() {
@@ -990,25 +1044,19 @@ window.showLeaderboard = function() {
     const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
 
     if (isPointsMode) {
-        // ==========================================
-        // --- 1. نظام النقاط ---
-        // ==========================================
         systemTypeElement.innerText = "نظام الفوز: النقاط (الترتيب بالرصيد الأصغر)";
         headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>النقاط</th>`;
         
-        // حساب النقاط لكل لاعب بناءً على بطاقاته الحالية في الـ Firebase
         sortedPlayers.forEach(p => {
             const serverPlayer = playersData[p.id];
             p.points = calculateHandPoints(serverPlayer ? serverPlayer.hand : []);
         });
         
-        // ترتيب تصاعدي: صاحب النقاط الأقل هو الأول
         sortedPlayers.sort((a, b) => a.points - b.points);
         
-// رسم الجدول
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
-            const isLeaver = playersData[p.id]?.isLeaver; // منسحب؟
+            const isLeaver = playersData[p.id]?.isLeaver;
             
             const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
@@ -1024,26 +1072,16 @@ window.showLeaderboard = function() {
         });
         
     } else {
-        // ==========================================
-        // --- 2. النظام التتابعي ---
-        // ==========================================
         systemTypeElement.innerText = "نظام الفوز: التتابعي (الخروج المتسلسل)";
-        // قمنا بتغيير الرأس الأخير ليكون "عدد الأدوار"
         headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>عدد الأدوار</th>`;
         
         sortedPlayers.forEach(p => {
             const serverPlayer = playersData[p.id];
-            // إذا لم ينتهِ، نضع له ترتيب افتراضي متأخر جداً (999)
             p.finRank = p.finishedRank || 999;
-            // حفظ عدد البطاقات للمقارنة بين الذين لم ينتهوا
             p.hCount = serverPlayer ? (serverPlayer.handCount || 0) : 0;
-            // جلب عدد الحركات من السيرفر
             p.movesCount = serverPlayer ? (serverPlayer.movesCount || 0) : 0;
         });
 
-        // الترتيب:
-        // 1. حسب من خرج أولاً (finishedRank أصغر).
-        // 2. إذا تساووا (كلاهما لم يخرج 999)، يرتبون حسب الأقل بطاقات متبقية.
         sortedPlayers.sort((a, b) => {
             if (a.finRank !== b.finRank) {
                 return a.finRank - b.finRank;
@@ -1051,14 +1089,11 @@ window.showLeaderboard = function() {
             return a.hCount - b.hCount; 
         });
         
-        // رسم الجدول
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
             const rowClass = isMe ? 'is-me-row' : '';
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
             const rankText = rankNames[idx] || (idx + 1);
-            
-            // هنا يظهر عدد الحركات أو الأدوار التي قام بها اللاعب
             const movesText = `${p.movesCount} دور`;
             
             tbody.innerHTML += `
@@ -1072,15 +1107,11 @@ window.showLeaderboard = function() {
     
     modal.style.display = 'flex';
         
-    // ==========================================
-    // --- منطق العد التنازلي والانتقال التلقائي ---
-    // ==========================================
     let timeLeft = 10;
     const timerBar = document.getElementById('timer-bar');
     const countdownText = document.getElementById('countdown-text');
     const totalOffset = 176;
 
-    // تصفير العداد بصرياً في حال ظهرت اللوحة مرة أخرى
     if (timerBar) timerBar.style.strokeDashoffset = 0;
     if (countdownText) countdownText.innerText = timeLeft;
 
@@ -1100,15 +1131,12 @@ window.showLeaderboard = function() {
     }, 1000);
 };
 
-// دالة النقل والتصفير التي تُستدعى عند انتهاء الوقت
 async function handleAutoTransition() {
     if (!playersData || !playersData[playerId]) return;
 
-    // تحديد من هو الأدمن بناءً على وقت الانضمام
     const playerList = Object.values(playersData).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
     const isAdmin = (playerList.length > 0 && playerId === playerList[0].id);
 
-    // 1. تصفير بيانات اللاعب الخاصة باللعبة (حتى يبدأ الجولة القادمة نظيفاً) وتطبيق نقل الفريق
     const playerUpdates = {
         [`rooms/${roomId}/players/${playerId}/team`]: "spectators-list",
         [`rooms/${roomId}/players/${playerId}/hand`]: null,
@@ -1119,7 +1147,6 @@ async function handleAutoTransition() {
     };
     await update(ref(db), playerUpdates);
 
-    // 2. إذا كان اللاعب هو الأدمن، يقوم بتصفير حالة الغرفة بالكامل
     if (isAdmin) {
         const roomUpdates = {
             [`rooms/${roomId}/status`]: "lobby",
@@ -1131,7 +1158,6 @@ async function handleAutoTransition() {
         await update(ref(db), roomUpdates);
     }
 
-    // 3. توجيه اللاعب لصفحة الردهة
     window.location.href = `lobby.html?r=${roomId}&p=${playerId}`;
 }
 </script>

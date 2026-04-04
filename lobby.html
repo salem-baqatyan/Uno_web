@@ -455,7 +455,7 @@ input:disabled + .slider {
     { id: 'points', title: 'نظام النقاط', hint: 'يتغير هدف اللعبة: أول من ينهي أوراقه يحدد ترتيب البقية.', type: 'toggle', checked: false },
     { id: 'eraser', title: 'بطاقة الماسح', hint: 'تفعيل بطاقة بيضاء تمحو السحب المتراكم عليك.', type: 'toggle', checked: false }
 ];
-// إعدادات الأونو الافتراضية
+
 const defaultSettings = {
     players: 2, 
     decks: 1, 
@@ -465,10 +465,11 @@ const defaultSettings = {
     eraser: false,
     timer: 0
 };
-let localSettings = { ...defaultSettings };
+
+let localSettings = {};
 
 function renderBox(s) {
-    const currentVal = (localSettings && localSettings[s.id] !== undefined) ? localSettings[s.id] : s.val;
+    const currentVal = s.val;
 
     const control = s.type === 'counter' 
         ? `<div class="counter-group">
@@ -493,22 +494,20 @@ function renderBox(s) {
     function updateEraserStatus() {
     const stackingToggle = document.getElementById('toggle-stacking');
     const eraserToggle = document.getElementById('toggle-eraser');
-    const eraserBox = eraserToggle.closest('.setting-box'); // للحصول على الحاوية الأب لتغيير شكلها
+    const eraserBox = eraserToggle.closest('.setting-box');
 
     if (!stackingToggle.checked) {
-        eraserToggle.checked = false; // إطفاء الماسح تلقائياً
-        eraserToggle.disabled = true; // منع النقر عليه
-        eraserBox.style.opacity = "0.4"; // جعل الصندوق باهتاً
-        eraserBox.style.pointerEvents = "none"; // منع أي تفاعل مع الصندوق
+        eraserToggle.checked = false; 
+        eraserToggle.disabled = true; 
+        eraserBox.style.opacity = "0.4"; 
+        eraserBox.style.pointerEvents = "none"; 
     } else {
-        // إذا كان التراكم مفعلاً
         eraserToggle.disabled = false;
         eraserBox.style.opacity = "1";
         eraserBox.style.pointerEvents = "auto";
     }
 }
 
-/* ---------- 1. Setup & Config ---------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, onDisconnect, update, runTransaction, remove, get, serverTimestamp } 
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
@@ -527,7 +526,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// استخراج أو إنشاء معرف الغرفة
 let urlParams = new URLSearchParams(window.location.search);
 let roomId = urlParams.get('r');
 if (!roomId) {
@@ -535,7 +533,6 @@ if (!roomId) {
     window.location.href = window.location.pathname + '?r=' + roomId;
 }
 
-// استخراج أو إنشاء معرف اللاعب
 let playerId = localStorage.getItem('uno_playerId');
 if (!playerId) {
     playerId = Math.random().toString(36).substring(2, 8);
@@ -543,7 +540,6 @@ if (!playerId) {
 }
 sessionStorage.setItem('playerId', playerId);
 
-// مراجع قاعدة البيانات
 const roomRef = ref(db, `rooms/${roomId}`);
 const playersRef = ref(db, `rooms/${roomId}/players`);
 const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
@@ -552,7 +548,6 @@ const statusRef = ref(db, `rooms/${roomId}/status`);
 const globalPlayersRef = ref(db, `global_players/${playerId}`);
 const connectedRef = ref(db, ".info/connected");
 
-/* ---------- 2. State & Assets ---------- */
 let myData = {
     id: playerId,
     name: "",
@@ -571,7 +566,6 @@ const avatarImages = [
     "img/avatar/surprised_man.webp",
 ];
 
-// حدود الإعدادات للواجهة
 const gameSettingsLimits = {
     players: { min: 2, max: 10 },
     decks: { min: 1, max: 5 },
@@ -581,20 +575,18 @@ const gameSettingsLimits = {
 const slotColors = ['slot-0', 'slot-1', 'slot-2', 'slot-3', 'slot-4', 'slot-5', 'slot-6', 'slot-7', 'slot-8', 'slot-9'];
 
 
-/* ---------- 3. Profile Management ---------- */
 function setupPresence() {
     onValue(connectedRef, (snap) => {
         if (snap.val() === true) {
-            // بمجرد الاتصال، نخبر السيرفر بما يجب فعله عند الانقطاع
             onDisconnect(myPlayerRef).update({
                 isOffline: true,
                 lastActive: serverTimestamp()
             });
-            // نؤكد أننا متصلون الآن
             update(myPlayerRef, { isOffline: false, lastActive: serverTimestamp() });
         }
     });
 }
+
 async function renderAvatars() {
     const container = document.getElementById('avatarContainer');
     if (!container) return;
@@ -652,7 +644,7 @@ window.saveProfile = async () => {
     
     const roomSnap = await get(roomRef);
     if (roomSnap.exists() && roomSnap.val().status === "started") {
-        myData.slot = "spectators"; // إذا اللعبة شغالة يدخل متفرج
+        myData.slot = "spectators"; 
     }
 
     document.getElementById('profileModal').style.display = 'none';
@@ -695,7 +687,6 @@ window.leaveLobby = () => {
 };
 
 
-/* ---------- 4. Utility Helpers ---------- */
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -754,8 +745,6 @@ function startHeartbeat() {
     setInterval(() => { if (hasJoined && isAdmin) updateRoomActivity(); }, 60000);
 }
 
-
-/* ---------- 5. Lobby & Team Logic ---------- */
 document.getElementById('roomDisplay').innerText = "🔗 " + roomId;
 
 function updatePlayersGrid(numberOfPlayers) {
@@ -778,7 +767,6 @@ function updatePlayersGrid(numberOfPlayers) {
     }
 }
 
-// دالة الانضمام لخانة معينة أو للجمهور
 window.joinSlot = (index) => {
     if (!hasJoined) return;
     const targetSlot = index === 'spectators' ? 'spectators' : `slot-${index}`;
@@ -792,7 +780,7 @@ window.joinSlot = (index) => {
     runTransaction(playersRef, (players) => {
         if (players) {
             const isTaken = Object.values(players).some(p => p.slot === targetSlot && p.id !== playerId);
-            if (isTaken) return; // الخانة مأخوذة
+            if (isTaken) return; 
         }
         if (!players) players = {};
         if (!players[playerId]) players[playerId] = myData;
@@ -802,14 +790,11 @@ window.joinSlot = (index) => {
     });
 };
 
-// وظيفة للانضمام للجمهور (مرتبطة بالزر في HTML)
 window.joinTeam = (teamId) => {
     if (teamId === 'spectators-list') joinSlot('spectators');
 };
 
-// توزيع اللاعبين على الخانات في الواجهة
 function renderLobby(players, adminId, currentSettings) {
-    // 1. تنظيف كل الخانات والجمهور
     const spectatorsContainer = document.getElementById('spectators-list');
     if(spectatorsContainer) spectatorsContainer.innerHTML = '';
     
@@ -824,7 +809,6 @@ function renderLobby(players, adminId, currentSettings) {
         }
     }
 
-    // 2. وضع اللاعبين في أماكنهم
     Object.values(players).forEach(p => {
         const isMe = p.id === playerId;
         const isPlayerAdmin = p.id === adminId;
@@ -848,7 +832,6 @@ function renderLobby(players, adminId, currentSettings) {
             const targetContainer = document.getElementById(`slot-${index}`);
             const targetBtn = document.getElementById(`btn-slot-${index}`);
             
-            // إذا كانت الخانة موجودة ضمن العدد المسموح
             if (targetContainer && index < currentSettings.players) {
                 targetContainer.innerHTML = playerHtml;
                 if(targetBtn) {
@@ -858,14 +841,12 @@ function renderLobby(players, adminId, currentSettings) {
                     targetBtn.disabled = true;
                 }
             } else {
-                // إذا قلل الآدمن عدد الخانات، ارجع اللاعب للجمهور
                 if (isMe) joinSlot('spectators');
             }
         }
     });
 }
 
-// عرض نافذة كل اللاعبين
 window.openPlayersModal = async () => {
     const modal = document.getElementById('playersListModal');
     if (modal.style.display === 'flex') { modal.style.display = 'none'; return; }
@@ -902,8 +883,6 @@ document.addEventListener('click', (e) => {
 });
 
 
-/* ---------- 6. Admin & Game Settings ---------- */
-
 window.changeSetting = async (type, delta) => {
     if (!isAdmin) return showToast("الآدمن فقط يمكنه تعديل الإعدادات");
     
@@ -922,14 +901,13 @@ window.changeSetting = async (type, delta) => {
 
 window.toggleSetting = (type, isChecked) => {
     if (!isAdmin) {
-        document.getElementById(`toggle-${type}`).checked = !isChecked; // إرجاع الزر لشكله
+        document.getElementById(`toggle-${type}`).checked = !isChecked; 
         return showToast("الآدمن فقط يمكنه تعديل الإعدادات");
     }
     update(settingsRef, { [type]: isChecked });
     updateRoomActivity();
 };
 
-// إعدادات المؤقت
 window.openTimerModal = () => { if (isAdmin) document.getElementById('timerModal').style.display = 'flex'; };
 window.changeTimer = (val) => {
     if (!isAdmin) return;
@@ -938,7 +916,6 @@ window.changeTimer = (val) => {
     updateRoomActivity();
 };
 
-// القواعد
 window.toggleRulesModal = (show) => { document.getElementById('rulesModal').style.display = show ? 'flex' : 'none'; };
 window.toggleAccordion = (header) => {
     const content = header.nextElementSibling;
@@ -952,6 +929,13 @@ onValue(settingsRef, (snapshot) => {
     const s = snapshot.val();
     if (!s) return;
     localSettings = s;
+
+    const roomVisibility = s.visibility; 
+    
+    const roomTypeBadge = document.getElementById('roomTypeBadge');
+    if (roomTypeBadge) {
+        roomTypeBadge.innerText = (roomVisibility === 'public') ? "غرفة عامة 🌍" : "غرفة خاصة 🔒";
+    }
 
     const container = document.getElementById('settings-container');
     if (container) {
@@ -968,24 +952,18 @@ onValue(settingsRef, (snapshot) => {
             </div>
         `;
 
-        // 🟢 أضف الأسطر هنا بعد أن تضمن أن الصناديق تم إنشاؤها في الـ DOM
         const stackingToggle = document.getElementById('toggle-stacking');
         if (stackingToggle) {
-            // نزيل المستمع القديم أولاً (للاحتياط عند تكرار التحديث) ثم نضيفه مجدداً
             stackingToggle.removeEventListener('change', updateEraserStatus);
             stackingToggle.addEventListener('change', updateEraserStatus);
-            
-            // تحديث حالة زر الماسح فوراً بناءً على حالة التراكم القادمة من السيرفر
             updateEraserStatus();
         }
     }
 
-    // تحديث الأرقام
     if(document.getElementById('val-players')) document.getElementById('val-players').innerText = s.players;
     if(document.getElementById('val-decks')) document.getElementById('val-decks').innerText = s.decks;
     if(document.getElementById('val-cards')) document.getElementById('val-cards').innerText = s.cards;
 
-    // تحديث حالة الأزرار (تفعيل/تعطيل)
     if(document.getElementById('btn-players-dec')) document.getElementById('btn-players-dec').disabled = (s.players === gameSettingsLimits.players.min);
     if(document.getElementById('btn-players-inc')) document.getElementById('btn-players-inc').disabled = (s.players === gameSettingsLimits.players.max);
     
@@ -995,7 +973,6 @@ onValue(settingsRef, (snapshot) => {
     if(document.getElementById('btn-cards-dec')) document.getElementById('btn-cards-dec').disabled = (s.cards === gameSettingsLimits.cards.min);
     if(document.getElementById('btn-cards-inc')) document.getElementById('btn-cards-inc').disabled = (s.cards === gameSettingsLimits.cards.max);
 
-    // تحديث السويتشات
     if(document.getElementById('toggle-stacking')) document.getElementById('toggle-stacking').checked = s.stacking;
     if(document.getElementById('toggle-points')) document.getElementById('toggle-points').checked = s.points;
     if(document.getElementById('toggle-eraser')) document.getElementById('toggle-eraser').checked = s.eraser;
@@ -1011,7 +988,6 @@ onValue(settingsRef, (snapshot) => {
         });
     }
 
-    // تحديث المؤقت
     const seconds = s.timer || 0;
     const displayTimer = document.getElementById('lobbyDisplayTimer');
     let label = "بدون", icon = "🚫", displayStr = "";
@@ -1033,8 +1009,9 @@ onValue(settingsRef, (snapshot) => {
 
     const timerSlider = document.getElementById('timerSlider');
     const valMap = { 0: 0, 5: 1, 15: 2, 30: 3 };
-    if(timerSlider) timerSlider.value = valMap[seconds] || 0;
-
+    timerSlider.oninput = (e) => {
+        window.changeTimer(parseInt(e.target.value));
+    };
     get(playersRef).then(snap => {
         if(snap.exists()) {
             updateStartButtonText(snap.val(), s);
@@ -1042,18 +1019,36 @@ onValue(settingsRef, (snapshot) => {
     });
 });
 
-onValue(playersRef, (snapshot) => {
+onValue(playersRef, async (snapshot) => {
     const players = snapshot.val();
     if (!players) return;
     
     const playerList = Object.values(players);
     document.getElementById('playerCount').innerText = playerList.length;
     
-    const onlinePlayers = playerList.filter(p => !p.isOffline).sort((a, b) => a.joinedAt - b.joinedAt);
-    const adminId = onlinePlayers.length > 0 ? onlinePlayers[0].id : null;
-    isAdmin = (playerId === adminId);
+    const onlinePlayers = playerList
+        .filter(p => !p.isOffline)
+        .sort((a, b) => a.joinedAt - b.joinedAt);
     
-    // 🟢 استبدال كل كود زر البدء الطويل بالسطر التالي:
+    const roomSnap = await get(roomRef);
+    const creatorId = roomSnap.exists() ? roomSnap.val().creatorId : null;
+    
+    let currentAdminId = null;
+
+    const isCreatorOnline = creatorId && players[creatorId] && !players[creatorId].isOffline;
+
+    if (isCreatorOnline) {
+        currentAdminId = creatorId;
+    } else if (onlinePlayers.length > 0) {
+        currentAdminId = onlinePlayers[0].id;
+    }
+
+    const currentDbAdmin = roomSnap.exists() ? roomSnap.val().adminId : null;
+    if (currentAdminId && currentAdminId !== currentDbAdmin) {
+        update(roomRef, { adminId: currentAdminId });
+    }
+    isAdmin = (playerId === currentAdminId);
+    
     updateStartButtonText(players, localSettings);
     
     const settingsPanel = document.querySelector('.settings-panel');
@@ -1062,10 +1057,9 @@ onValue(playersRef, (snapshot) => {
         settingsPanel.style.pointerEvents = isAdmin ? "auto" : "none";
     }
     
-    renderLobby(players, adminId, localSettings);
+    renderLobby(players, currentAdminId, localSettings);
 });
 
-/* ---------- 7. Game Engine & Start ---------- */
 function updateStartButtonText(playersData, settings) {
     const startBtn = document.getElementById('startBtn');
     if (!startBtn || !isAdmin) return;
@@ -1073,13 +1067,12 @@ function updateStartButtonText(playersData, settings) {
     startBtn.style.display = 'block';
 
     const playerList = Object.values(playersData || {});
-    const requiredPlayers = settings.players; // العدد المحدد الحالي (مثلاً 5)
+    const requiredPlayers = settings.players; 
 
-    // 🟢 التعديل هنا: نحسب فقط اللاعبين الذين في سلوتات صالحة وأصغر من العدد الأقصى
     const slottedPlayersCount = playerList.filter(p => {
         if (p.slot && p.slot.startsWith('slot-')) {
             const slotIndex = parseInt(p.slot.split('-')[1]);
-            return slotIndex < requiredPlayers; // إذا كان السلوت 5 والحد 5، يُستبعد لأن السلوتات تبدأ من 0 إلى 4
+            return slotIndex < requiredPlayers; 
         }
         return false;
     }).length;
@@ -1105,26 +1098,21 @@ function createUnoDeck(numDecks = 1, includeEraser = false) {
 
     for (let d = 0; d < numDecks; d++) {
 
-        // الأرقام
         colors.forEach(color => {
 
-            // صفر مرة واحدة
             deck.push(`${color}Zero`);
 
-            // 1–9 مرتين
             for (let i = 1; i <= 9; i++) {
                 deck.push(`${color}${numbers[i]}`);
                 deck.push(`${color}${numbers[i]}`);
             }
 
-            // الأكشن مرتين
             actionTypes.forEach(action => {
                 deck.push(`${color}${action}`);
                 deck.push(`${color}${action}`);
             });
         });
 
-        // Wild
         for (let i = 0; i < 4; i++) {
             deck.push("wildColor");
             deck.push("wildDrawFour");
@@ -1135,7 +1123,6 @@ function createUnoDeck(numDecks = 1, includeEraser = false) {
         }
     }
 
-    // 🔒 تحقق نهائي من العدد
     const expectedPerDeck = includeEraser ? 109 : 108;
     const expectedTotal = expectedPerDeck * numDecks;
 
@@ -1156,7 +1143,6 @@ window.handleStartGame = async function() {
     const playersData = playersSnap.val() || {};
     const settings = settingsSnap.val() || defaultSettings;
 
-    // جلب اللاعبين المنضمين للسلوتات فقط
     let activePlayers = Object.values(playersData)
         .filter(p => p.slot.startsWith('slot-'))
         .sort((a, b) => {
@@ -1165,21 +1151,17 @@ window.handleStartGame = async function() {
             return slotA - slotB;
         });
 
-    // --- الشرط الجديد المحدث ---
-    const requiredPlayers = settings.players; // العدد المحدد في الإعدادات
+    const requiredPlayers = settings.players; 
     if (activePlayers.length < requiredPlayers) {
         return showToast(`⚠️ لا يمكن البدء، يجب أن يكتمل العدد (${activePlayers.length}/${requiredPlayers})`);
     }
-    // --------------------------
 
     document.getElementById('startBtn').innerText = "جاري التجهيز...";
     document.getElementById('startBtn').disabled = true;
 
-    // 1. إنشاء وخلط الكومة
     let deck = createUnoDeck(settings.decks, settings.eraser);
     shuffleArray(deck);
 
-    // 2. توزيع البطاقات على اللاعبين
     let hands = {};
     activePlayers.forEach(p => {
         hands[p.id] = [];
@@ -1188,22 +1170,20 @@ window.handleStartGame = async function() {
         }
     });
 
-    // 3. اختيار أول بطاقة وفق القواعد الخاصة
     let firstCard;
     while (true) {
         firstCard = deck.pop();
         if (firstCard === "wildDrawFour" || firstCard.includes("DrawTwo") || firstCard === "Eraser") {
             deck.unshift(firstCard); 
         } else {
-            break; // بطاقة صالحة للبدء
+            break; 
         }
     }
 
-    let initialDirection = 1; // 1 = عادي، -1 = عكسي
-    let startingPlayerIndex = 0; // افتراضياً يبدأ اللاعب صاحب Slot-0
+    let initialDirection = 1; 
+    let startingPlayerIndex = 0; 
     let initialDrawStack = 0;
 
-    // حالة بطاقة العكس (Reverse) كأول بطاقة
     if (firstCard.includes("Reverse")) {
         initialDirection = -1;
     }
@@ -1221,20 +1201,18 @@ window.handleStartGame = async function() {
             currentTurnId: startingPlayerId,
             direction: initialDirection,
             drawStack: 0,
-            selectedColor: "", // إذا كانت Wild سيقوم النظام في صفحة اللعب بطلب اللون
+            selectedColor: "", 
             lastUpdated: serverTimestamp()
         }
     };
 
     try {
-        // تحديث اللعبة في قاعدة البيانات
         await set(ref(db, `rooms/${roomId}/game`), gameState);
 
         const updates = {};
         activePlayers.forEach(p => {
             updates[`rooms/${roomId}/players/${p.id}/hand`] = hands[p.id];
             updates[`rooms/${roomId}/players/${p.id}/handCount`] = hands[p.id].length;
-            // تصفير أي حالات سابقة
             updates[`rooms/${roomId}/players/${p.id}/finishedRank`] = null;
             updates[`rooms/${roomId}/players/${p.id}/saidUno`] = false;
         });
@@ -1261,7 +1239,6 @@ onValue(roomRef, (snap) => {
 });
 
 
-/* ---------- Final: Bootstrapping ---------- */
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('profileModal').style.display = 'none';
     await renderAvatars(); 
