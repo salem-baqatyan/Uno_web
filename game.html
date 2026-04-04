@@ -279,7 +279,8 @@
 <script src="/strings/seat_positions.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, update, onValue, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getDatabase, ref, update, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+import { serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAiQtfrXCU_Z3-N_UczLWXJKff4QJ5pGFY",
@@ -710,9 +711,12 @@ onValue(gameRef, (snap) => {
     gameState = snap.val();
     if (!gameState) return;
 
+    const loader = document.getElementById('loadingScreen');
+    if (loader) loader.style.display = 'none';
+
     if (gameState.status === 'finished') {
         if (gameTimerInterval) clearInterval(gameTimerInterval);
-        document.getElementById('gameTimer').innerText = ''; // تصفير التايمر
+        document.getElementById('gameTimer').innerText = ''; 
         showLeaderboard();
     } else {
         renderGame();
