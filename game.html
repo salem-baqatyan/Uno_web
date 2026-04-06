@@ -295,6 +295,16 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+let serverTimeOffset = 0;
+const offsetRef = ref(db, ".info/serverTimeOffset");
+onValue(offsetRef, (snap) => {
+    serverTimeOffset = snap.val() || 0;
+});
+
+// دالة للحصول على الوقت الموحد الآن
+function getServerNow() {
+    return Date.now() + serverTimeOffset;
+}
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
 const playerId = urlParams.get('p');
@@ -481,7 +491,7 @@ function isValidMove(playedStr) {
 }
 
 async function handlePlayCard(cardStr, cardIndex) {
-    if (!isValidMove(cardStr)) return alert("لا يمكنك لعب هذه البطاقة!");
+    if (!isValidMove(cardStr)) return showToast("لا يمكنك لعب هذه البطاقة!");
 
     const card = parseCard(cardStr);
     if (card.isWild) {
@@ -644,23 +654,23 @@ window.acceptDrawStack = async function() {
 };
 
 document.getElementById('deckPile').onclick = async () => {
-    if (gameState.turnState.currentTurnId !== playerId) return alert("ليس دورك!");
-    if (gameState.turnState.drawStack > 0) return alert("اضغط على (اسحب وتخطي الدور) لإنهاء التراكمات!");
+    if (gameState.turnState.currentTurnId !== playerId) return showToast("ليس دورك!");
+    if (gameState.turnState.drawStack > 0) return showToast("اضغط على (اسحب وتخطي الدور) لإنهاء التراكمات!");
 
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
 
     const drawRes = extractCardsToDraw(1, deck, discardPile);
-    if (drawRes.drawnCards.length === 0) return alert("لا توجد بطاقات كافية!");
+    if (drawRes.drawnCards.length === 0) return showToast("لا توجد بطاقات كافية!");
     
-    myHand.push(drawRes.drawnCards[0]);
+    const updatedHand = [...myHand, drawRes.drawnCards[0]]; 
 
     const updates = {};
+    
     updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
     updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
-    updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
-    updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
-    
+    updates[`rooms/${roomId}/players/${playerId}/hand`] = updatedHand;
+    updates[`rooms/${roomId}/players/${playerId}/handCount`] = updatedHand.length;
     updates[`rooms/${roomId}/players/${playerId}/saidUno`] = false;
 
     const currentMoves = playersData[playerId].movesCount || 0;
@@ -670,7 +680,7 @@ document.getElementById('deckPile').onclick = async () => {
     const nextExpireAt = timerSetting > 0 ? (Date.now() + (timerSetting * 1000)) : null;
 
     updates[`rooms/${roomId}/game/turnState/currentTurnId`] = getNextPlayerId(false, gameState.turnState.direction);
-    updates[`rooms/${roomId}/game/turnState/expireAt`] = nextExpireAt; // 👈 هنا
+    updates[`rooms/${roomId}/game/turnState/expireAt`] = nextExpireAt;
 
     await update(ref(db), updates);
 };
@@ -684,16 +694,19 @@ onValue(playersRef, (snap) => {
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
     
     if (gameState && gameState.status !== 'finished') {
-        const now = Date.now();
-        
+        const now = getServerNow(); // 👈 الوقت الموحد
         const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
         
         activePlayersList.forEach(p => {
-            if (p.isDisconnected && p.disconnectTime) {
-                const elapsed = Math.floor((now - p.disconnectTime) / 1000);
-                
-                if (elapsed >= 30 && isAdmin) {
-                    handleLeaverLogic(p.id);
+            const lastMoveTime = gameState.turnState.lastUpdated || 0;
+            const currentTurnId = gameState.turnState.currentTurnId;
+            
+            // إذا مر 45 ثانية (30 + 15 احتياط) ولم يتحرك صاحب الدور
+            if (isAdmin && (now - lastMoveTime > 45000) && !gameState.status !== 'finished') {
+                const currentPlayer = playersData[currentTurnId];
+                if (currentPlayer && !currentPlayer.finishedRank) {
+                    // السيرفر يجبره على الانسحاب لأن جهازه لم يرسل إشارة قطع اتصال
+                    handleLeaverLogic(currentTurnId);
                 }
             }
         });
@@ -721,18 +734,16 @@ onValue(gameRef, (snap) => {
     } else {
         renderGame();
         
-        // ⏱️ تشغيل مؤقت الدور إذا كان مفعل في الإعدادات
         const timerSetting = parseInt(roomSettings.timer) || 0;
         if (timerSetting > 0 && gameState.turnState && gameState.turnState.expireAt) {
             startTurnTimer(gameState.turnState.expireAt);
         } else {
             if (gameTimerInterval) clearInterval(gameTimerInterval);
-            document.getElementById('gameTimer').innerText = '∞'; // لعب حر
+            document.getElementById('gameTimer').innerText = '';
         }
     }
 });
 
-// دالة المؤقت التنازلي المرئي والآلي
 function startTurnTimer(expireAt) {
     if (gameTimerInterval) clearInterval(gameTimerInterval);
     const timerElement = document.getElementById('gameTimer');
@@ -742,8 +753,7 @@ function startTurnTimer(expireAt) {
         const timeLeft = Math.ceil((expireAt - now) / 1000);
 
         if (timeLeft > 0) {
-            timerElement.innerText = `${timeLeft}ث`;
-            // تلوين التايمر بالأحمر عند اقتراب انتهاء الوقت
+            timerElement.innerText = `${timeLeft}`;
             if (timeLeft <= 5) {
                 timerElement.style.color = '#ff4d4d';
                 timerElement.style.fontWeight = 'bold';
@@ -752,11 +762,9 @@ function startTurnTimer(expireAt) {
                 timerElement.style.fontWeight = 'normal';
             }
         } else {
-            // انتهى الوقت ⏳
             clearInterval(gameTimerInterval);
-            timerElement.innerText = `0ث`;
+            timerElement.innerText = `0`;
             
-            // الآدمن فقط هو الذي ينفذ الحركة لعدم تكرار السحب في الـ Database
             const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
             if (isAdmin) {
                 await handleTimeoutPenalty(gameState.turnState.currentTurnId);
@@ -765,7 +773,6 @@ function startTurnTimer(expireAt) {
     }, 1000);
 }
 
-// دالة معاقبة اللاعب الذي انتهى وقته
 async function handleTimeoutPenalty(timedOutPlayerId) {
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
@@ -775,9 +782,8 @@ async function handleTimeoutPenalty(timedOutPlayerId) {
 
     const currentHand = timedOutPlayer.hand || [];
     
-    // سحب بطاقة واحدة
     const drawRes = extractCardsToDraw(1, deck, discardPile);
-    if (drawRes.drawnCards.length === 0) return; // الكوتشينة انتهت
+    if (drawRes.drawnCards.length === 0) return;
     
     const newHand = currentHand.concat(drawRes.drawnCards);
     const updates = {};
@@ -791,11 +797,9 @@ async function handleTimeoutPenalty(timedOutPlayerId) {
     const currentMoves = timedOutPlayer.movesCount || 0;
     updates[`rooms/${roomId}/players/${timedOutPlayerId}/movesCount`] = currentMoves + 1;
 
-    // تجهيز الوقت للّاعب القادم بناءً على الخيار
     const timerSetting = parseInt(roomSettings.timer) || 0;
     const nextExpireAt = timerSetting > 0 ? (Date.now() + (timerSetting * 1000)) : null;
 
-    // تخطي دوره ونقله للاعب التالي
     const nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
     updates[`rooms/${roomId}/game/turnState`] = {
         currentTurnId: nextPlayerId,
@@ -803,10 +807,9 @@ async function handleTimeoutPenalty(timedOutPlayerId) {
         selectedColor: gameState.turnState.selectedColor || null,
         drawStack: gameState.turnState.drawStack || 0,
         lastUpdated: serverTimestamp(),
-        expireAt: nextExpireAt // 👈 تحديد انتهاء وقت اللاعب القادم
+        expireAt: nextExpireAt
     };
 
-    // إرسال رسالة تخطى بالتوست للجميع
     updates[`rooms/${roomId}/game/toastMessage`] = { 
         msg: `⏰ انتهى وقت ${timedOutPlayer.name} وتم سحب بطاقة له!`, 
         time: Date.now() 
@@ -914,8 +917,16 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 };
 
 async function handleLeaverLogic(leaverId) {
-    const updates = {};
     const leaver = playersData[leaverId];
+    if (!leaver) return;
+
+    const now = getServerNow();
+    const elapsed = Math.floor((now - (leaver.disconnectTime || 0)) / 1000);
+    
+    // إذا كان اللاعب فعلياً متصل الآن أو لم يمر الوقت كلياً، نلغي العملية
+    if (!leaver.isDisconnected && (now - (gameState.turnState.lastUpdated || 0) < 45000)) return;
+
+    const updates = {};
     if (!leaver || leaver.team === "spectators-list") return; 
 
     let deck = [...(gameState.deck || [])];
@@ -1164,6 +1175,7 @@ async function handleAutoTransition() {
 
     window.location.href = `lobby.html?r=${roomId}&p=${playerId}`;
 }
+
 </script>
 </body>
 </html>
