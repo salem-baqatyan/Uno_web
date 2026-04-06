@@ -295,30 +295,28 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-let serverTimeOffset = 0;
-const offsetRef = ref(db, ".info/serverTimeOffset");
-onValue(offsetRef, (snap) => {
-    serverTimeOffset = snap.val() || 0;
-});
-
-// دالة للحصول على الوقت الموحد الآن
-function getServerNow() {
-    return Date.now() + serverTimeOffset;
-}
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
 const playerId = urlParams.get('p');
 
 const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
 
-onDisconnect(myPlayerRef).update({
-    isDisconnected: true,
-    disconnectTime: serverTimestamp()
-});
+// نظام نبضات القلب الحقيقي لمراقبة الاتصال
+const connectedRef = ref(db, ".info/connected");
+onValue(connectedRef, (snap) => {
+    if (snap.val() === true) {
+        // بمجرد الاتصال، نربط السيرفر بحذف حالتنا لو أغلقنا المتصفح
+        onDisconnect(myPlayerRef).update({
+            isDisconnected: true,
+            disconnectTime: serverTimestamp()
+        });
 
-update(myPlayerRef, {
-    isDisconnected: false,
-    disconnectTime: null
+        // ونعلن فوراً أننا متصلون الآن
+        update(myPlayerRef, {
+            isDisconnected: false,
+            disconnectTime: null
+        });
+    }
 });
 
 const gameRef = ref(db, `rooms/${roomId}/game`);
@@ -694,19 +692,33 @@ onValue(playersRef, (snap) => {
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
     
     if (gameState && gameState.status !== 'finished') {
-        const now = getServerNow(); // 👈 الوقت الموحد
+        const now = Date.now();
         const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
+
+        // فلترة اللاعبين المتصلين فعلياً والذين لم ينتهوا بعد
+        const onlinePlayers = activePlayersList.filter(p => !p.isDisconnected && !p.finishedRank);
+
+        // 🚨 الحل الذكي لطلبك: لو ما بقي في الروم إلا أنت شغال والآخرين انقطعوا، ننهي القيم فوراً!
+        if (onlinePlayers.length === 1 && activePlayersList.length > 1) {
+             const updates = {};
+             updates[`rooms/${roomId}/game/status`] = 'finished';
+             
+             // نضع اللاعب المتبقي في المركز الأول
+             updates[`rooms/${roomId}/players/${onlinePlayers[0].id}/finishedRank`] = 1;
+             
+             // تحديث السيرفر ليرى الجميع شاشة النهاية
+             update(ref(db), updates);
+             showToast("انقطع الخصم! انتهت اللعبة بفوزك 🏆");
+             return; 
+        }
         
+        // فحص الـ 30 ثانية القديم (للرومات التي فيها أكثر من لاعبين)
         activePlayersList.forEach(p => {
-            const lastMoveTime = gameState.turnState.lastUpdated || 0;
-            const currentTurnId = gameState.turnState.currentTurnId;
-            
-            // إذا مر 45 ثانية (30 + 15 احتياط) ولم يتحرك صاحب الدور
-            if (isAdmin && (now - lastMoveTime > 45000) && !gameState.status !== 'finished') {
-                const currentPlayer = playersData[currentTurnId];
-                if (currentPlayer && !currentPlayer.finishedRank) {
-                    // السيرفر يجبره على الانسحاب لأن جهازه لم يرسل إشارة قطع اتصال
-                    handleLeaverLogic(currentTurnId);
+            if (p.isDisconnected && p.disconnectTime) {
+                const elapsed = Math.floor((now - p.disconnectTime) / 1000);
+                
+                if (elapsed >= 30 && isAdmin) {
+                    handleLeaverLogic(p.id);
                 }
             }
         });
@@ -882,16 +894,8 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         
         if (p.isDisconnected && p.disconnectTime) {
             disconnectClass = 'is-disconnected-gray';
-            
-            const now = Date.now();
-            const elapsed = Math.floor((now - p.disconnectTime) / 1000);
-            const timeLeft = Math.max(0, 30 - elapsed);
-            
-            if (timeLeft > 0) {
-                timerHTML = `<div class="disconnect-timer">${timeLeft}</div>`;
-            }
-        }
-        
+            // ✂️ تم حذف توليد timerHTML لكي لا تظهر أرقام غبية معلقة 29 و 30
+        }        
         seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${disconnectClass}`;
         
         if (pos.side === 'left') {
@@ -917,16 +921,8 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 };
 
 async function handleLeaverLogic(leaverId) {
-    const leaver = playersData[leaverId];
-    if (!leaver) return;
-
-    const now = getServerNow();
-    const elapsed = Math.floor((now - (leaver.disconnectTime || 0)) / 1000);
-    
-    // إذا كان اللاعب فعلياً متصل الآن أو لم يمر الوقت كلياً، نلغي العملية
-    if (!leaver.isDisconnected && (now - (gameState.turnState.lastUpdated || 0) < 45000)) return;
-
     const updates = {};
+    const leaver = playersData[leaverId];
     if (!leaver || leaver.team === "spectators-list") return; 
 
     let deck = [...(gameState.deck || [])];
