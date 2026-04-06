@@ -698,32 +698,27 @@ onValue(playersRef, (snap) => {
         // فلترة اللاعبين المتصلين فعلياً والذين لم ينتهوا بعد
         const onlinePlayers = activePlayersList.filter(p => !p.isDisconnected && !p.finishedRank);
 
-        // ⏱️ فحص انقطاع اللاعبين (يطبق للكل سواء الروم فيها 2 أو أكثر)
+        // 🚨 الحل الذكي لطلبك: لو ما بقي في الروم إلا أنت شغال والآخرين انقطعوا، ننهي القيم فوراً!
+        if (onlinePlayers.length === 1 && activePlayersList.length > 1) {
+             const updates = {};
+             updates[`rooms/${roomId}/game/status`] = 'finished';
+             
+             // نضع اللاعب المتبقي في المركز الأول
+             updates[`rooms/${roomId}/players/${onlinePlayers[0].id}/finishedRank`] = 1;
+             
+             // تحديث السيرفر ليرى الجميع شاشة النهاية
+             update(ref(db), updates);
+             showToast("انقطع الخصم! انتهت اللعبة بفوزك 🏆");
+             return; 
+        }
+        
+        // فحص الـ 30 ثانية القديم (للرومات التي فيها أكثر من لاعبين)
         activePlayersList.forEach(p => {
             if (p.isDisconnected && p.disconnectTime) {
                 const elapsed = Math.floor((now - p.disconnectTime) / 1000);
                 
-                // إذا مرت 30 ثانية كاملة ولم يعد اللاعب
                 if (elapsed >= 30 && isAdmin) {
-                    
-                    // حالة خاصة: إذا كنا لاعبين فقط وانقطع خصمك ولم يعد
-                    if (activePlayersList.length === 2) {
-                        const updates = {};
-                        updates[`rooms/${roomId}/game/status`] = 'finished';
-                        
-                        // أنت الفائز الأول
-                        updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = 1;
-                        
-                        // الخصم المنقطع يوضع كمنسحب في الترتيب الأخير
-                        updates[`rooms/${roomId}/players/${p.id}/finishedRank`] = 999;
-                        updates[`rooms/${roomId}/players/${p.id}/isLeaver`] = true;
-                        
-                        update(ref(db), updates);
-                        showToast("انتهت مهلة عودة الخصم! مبروك الفوز 🏆");
-                    } else {
-                        // إذا كانت الروم فيها أكثر من 2، نطبق منطق الطرد العادي الموجود مسبقاً
-                        handleLeaverLogic(p.id);
-                    }
+                    handleLeaverLogic(p.id);
                 }
             }
         });
@@ -1072,13 +1067,10 @@ window.showLeaderboard = function() {
         
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
-            const isLeaver = playersData[p.id]?.isLeaver; // جلب حالة الانسحاب
+            const isLeaver = playersData[p.id]?.isLeaver;
             
-            // إضافة كلاس خاص بالمنسحب لتمييز لونه لو أحببت
             const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
-            
-            // إذا كان منسحباً نظهر كلمة منسحب، وإلا نظهر ترتيبه الرقمي
             const rankText = isLeaver ? 'منسحب' : (rankNames[idx] || (idx + 1));
             const movesText = isLeaver ? '--' : `${p.movesCount} دور`;
             
@@ -1110,15 +1102,10 @@ window.showLeaderboard = function() {
         
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
-            const isLeaver = playersData[p.id]?.isLeaver; // جلب حالة الانسحاب
-            
-            // إضافة كلاس خاص بالمنسحب لتمييز لونه لو أحببت
-            const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
+            const rowClass = isMe ? 'is-me-row' : '';
             const playerName = isMe ? `${p.name} (أنت)` : p.name;
-            
-            // إذا كان منسحباً نظهر كلمة منسحب، وإلا نظهر ترتيبه الرقمي
-            const rankText = isLeaver ? 'منسحب' : (rankNames[idx] || (idx + 1));
-            const movesText = isLeaver ? '--' : `${p.movesCount} دور`;
+            const rankText = rankNames[idx] || (idx + 1);
+            const movesText = `${p.movesCount} دور`;
             
             tbody.innerHTML += `
                 <tr class="${rowClass}">
