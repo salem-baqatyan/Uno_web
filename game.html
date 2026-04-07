@@ -553,30 +553,42 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     myHand.splice(cardIndex, 1);
     discardPile.push(cardStr);
 
-    const updates = {};
-    let isGameOver = false;
-    let myRank = null;
+const updates = {};
+let isGameOver = false;
+let myRank = null;
+const now = Date.now();
 
-    // التحقق من الفوز
-    if (myHand.length === 0) {
-        if (isPointsMode) {
+// 1. إذا أنهى اللاعب الحالي أوراقه
+if (myHand.length === 0) {
+    if (isPointsMode) {
+        isGameOver = true;
+    } else {
+        const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
+        myRank = currentFinishedCount + 1;
+        updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
+
+        // تسجيل وقت النهاية للاعب الفائز/المنتهي
+        if (gameState.startTime) {
+            updates[`rooms/${roomId}/players/${playerId}/finishTime`] = now - gameState.startTime;
+        }
+
+        // إذا لم يتبقَ إلا لاعب واحد فقط في الملعب
+        if (activePlayersList.length - myRank <= 1) {
             isGameOver = true;
-        } else {
-            const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
-            myRank = currentFinishedCount + 1;
-            updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
-
-            if (gameState.startTime) {
-                const finishTimeMs = Date.now() - gameState.startTime;
-                updates[`rooms/${roomId}/players/${playerId}/finishTime`] = finishTimeMs;
-            }
-
-            // إذا لم يتبق إلا لاعب واحد لم ينتهِ، تنتهي اللعبة
-            if (activePlayersList.length - myRank <= 1) {
-                isGameOver = true;
-            }
         }
     }
+}
+
+// 2. إذا كانت اللعبة ستنتهي (بسبب فوز اللاعب أو بقاء خاسر واحد)
+if (isGameOver && !isPointsMode) {
+    // نبحث عن اللاعب الأخير الذي لم ينهِ أوراقه (الخاسر)
+    const loser = activePlayersList.find(p => p.id !== playerId && !p.finishedRank);
+    if (loser && gameState.startTime) {
+        // نسجل له الرتبة الأخيرة ووقت النهاية اللحظي
+        updates[`rooms/${roomId}/players/${loser.id}/finishedRank`] = activePlayersList.length;
+        updates[`rooms/${roomId}/players/${loser.id}/finishTime`] = now - gameState.startTime;
+    }
+}
 
     // تجهيز تحديثات اللاعب الحالي
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
