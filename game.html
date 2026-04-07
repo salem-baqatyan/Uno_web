@@ -504,6 +504,7 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     document.getElementById('colorPicker').style.display = 'none'; 
     
     const card = parseCard(cardStr);    
+    // تعريف دقيق لبطاقات الأكشن
     const isActionCard = card.value === "⊘" || 
                          card.value === "↻" || 
                          card.value === "+2" || 
@@ -511,20 +512,20 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
                          card.type === "wildColor" || 
                          card.isEraser;
 
-    if (myHand.length === 1 && isActionCard) {
-        return showToast("🚫يجب أن تكون بطاقتك الأخيرة رقماً.");
+    // القيد: لا يسمح بأن تكون البطاقة الأخيرة أكشن (فقط إذا كان النظام ليس نقاط)
+    const isPointsMode = roomSettings.points === true;
+    if (myHand.length === 1 && isActionCard && !isPointsMode) {
+        return showToast("🚫 لا يمكنك الفوز ببطاقة أكشن، يجب أن تكون بطاقتك الأخيرة رقماً.");
     }
 
     let nextDirection = gameState.turnState.direction;
     let skipNext = false;
     let addedStack = 0;
     const isStackingEnabled = roomSettings.stacking !== false;
-
     const playersStillPlaying = activePlayersList.filter(p => !p.finishedRank).length;
-
     let newDrawStack = (gameState.turnState.drawStack || 0);
     
-    
+    // منطق بطاقات الأكشن
     if (card.isEraser) {
         newDrawStack = 0; 
     } else {
@@ -533,7 +534,6 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
                 skipNext = true;
             } else {
                 nextDirection *= -1;
-                if (activePlayersList.length === 2) skipNext = true; 
             }
         } else if (card.value === "⊘") {
             skipNext = true;
@@ -545,49 +545,50 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
         newDrawStack += addedStack;
     }
 
-    let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
-    
+    // تحديث المصفوفات المحلية قبل الرفع للسيرفر
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
     
+    // إزالة البطاقة من اليد
     myHand.splice(cardIndex, 1);
-    
-    const isPointsMode = roomSettings.points === true;
-    let isGameOver = false;
-    let myRank = null;
-
-// ابحث عن الجزء الذي يتم فيه التحقق من myHand.length === 0 داخل executeMove
-if (myHand.length === 0) {
-    if (isPointsMode) {
-        isGameOver = true;
-    } else {
-        const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
-        myRank = currentFinishedCount + 1;
-
-        if (gameState.startTime) {
-            const finishTimeMs = Date.now() - gameState.startTime;
-            updates[`rooms/${roomId}/players/${playerId}/finishTime`] = finishTimeMs;
-        }
-
-        if (activePlayersList.length - myRank <= 1) {
-            isGameOver = true;
-        }
-    }
-}
-
     discardPile.push(cardStr);
 
     const updates = {};
+    let isGameOver = false;
+    let myRank = null;
+
+    // التحقق من الفوز
+    if (myHand.length === 0) {
+        if (isPointsMode) {
+            isGameOver = true;
+        } else {
+            const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
+            myRank = currentFinishedCount + 1;
+            updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
+
+            if (gameState.startTime) {
+                const finishTimeMs = Date.now() - gameState.startTime;
+                updates[`rooms/${roomId}/players/${playerId}/finishTime`] = finishTimeMs;
+            }
+
+            // إذا لم يتبق إلا لاعب واحد لم ينتهِ، تنتهي اللعبة
+            if (activePlayersList.length - myRank <= 1) {
+                isGameOver = true;
+            }
+        }
+    }
+
+    // تجهيز تحديثات اللاعب الحالي
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+    updates[`rooms/${roomId}/players/${playerId}/movesCount`] = (playersData[playerId].movesCount || 0) + 1;
 
-    const currentMoves = playersData[playerId].movesCount || 0;
-    updates[`rooms/${roomId}/players/${playerId}/movesCount`] = currentMoves + 1;
+    // حساب اللاعب التالي
+    let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
 
-    if (myRank) updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
-
+    // التعامل مع سحب البطاقات الإجباري (إذا كان التراكم معطلاً)
     if (addedStack > 0 && !isStackingEnabled) {
-        const targetPlayerId = getNextPlayerId(false, nextDirection); 
+        const targetPlayerId = nextPlayerId; // اللاعب الذي عليه الدور الآن هو من سيسحب
         const drawRes = extractCardsToDraw(newDrawStack, deck, discardPile);
         deck = drawRes.deck;
         discardPile = drawRes.discard;
@@ -597,13 +598,10 @@ if (myHand.length === 0) {
         updates[`rooms/${roomId}/players/${targetPlayerId}/handCount`] = targetHand.length;
         updates[`rooms/${roomId}/players/${targetPlayerId}/saidUno`] = false; 
         
-        newDrawStack = 0;
+        newDrawStack = 0; // تصفير التراكم بعد السحب
         
-        if (playersStillPlaying === 2) {
-            nextPlayerId = playerId; 
-        } else {
-            nextPlayerId = getNextPlayerId(true, nextDirection);
-        }
+        // في حال سحب +2 أو +4 والعدد 2، غالباً يقفز الدور ويعود لك
+        nextPlayerId = getNextPlayerId(true, nextDirection);
     }
 
     updates[`rooms/${roomId}/game/deck`] = deck;
@@ -621,12 +619,17 @@ if (myHand.length === 0) {
             selectedColor: chosenColor,
             drawStack: newDrawStack, 
             lastUpdated: serverTimestamp(),
-            expireAt: nextExpireAt // 👈 تحديث وقت اللاعب القادم
+            expireAt: nextExpireAt
         };
     }
-    await update(ref(db), updates);
-}
 
+    try {
+        await update(ref(db), updates);
+    } catch (e) {
+        console.error("Move update failed:", e);
+        showToast("خطأ في الاتصال، حاول مجدداً");
+    }
+}
 window.acceptDrawStack = async function() {
 if (gameState.turnState.currentTurnId !== playerId) return;
     
