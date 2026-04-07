@@ -393,8 +393,8 @@ function applyDynamicMargins() {
     const targetDistance = 425;
     let idealMargin = 0;
 
-    if (count <= 17) {
-        idealMargin = -21.4;
+    if (count <= 10) {
+        idealMargin = -12.8;
     } else {
         idealMargin = (targetDistance - (count * cardWidth)) / ((count - 1) * 2);
     }
@@ -501,8 +501,9 @@ async function handlePlayCard(cardStr, cardIndex) {
 }
 
 async function executeMove(cardStr, cardIndex, chosenColor) {
-    const card = parseCard(cardStr);
+    document.getElementById('colorPicker').style.display = 'none'; 
     
+    const card = parseCard(cardStr);    
     const isActionCard = card.value === "⊘" || 
                          card.value === "↻" || 
                          card.value === "+2" || 
@@ -522,6 +523,7 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     const playersStillPlaying = activePlayersList.filter(p => !p.finishedRank).length;
 
     let newDrawStack = (gameState.turnState.drawStack || 0);
+    
     
     if (card.isEraser) {
         newDrawStack = 0; 
@@ -554,17 +556,24 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     let isGameOver = false;
     let myRank = null;
 
-    if (myHand.length === 0) {
-        if (isPointsMode) {
+// ابحث عن الجزء الذي يتم فيه التحقق من myHand.length === 0 داخل executeMove
+if (myHand.length === 0) {
+    if (isPointsMode) {
+        isGameOver = true;
+    } else {
+        const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
+        myRank = currentFinishedCount + 1;
+
+        if (gameState.startTime) {
+            const finishTimeMs = Date.now() - gameState.startTime;
+            updates[`rooms/${roomId}/players/${playerId}/finishTime`] = finishTimeMs;
+        }
+
+        if (activePlayersList.length - myRank <= 1) {
             isGameOver = true;
-        } else {
-            const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
-            myRank = currentFinishedCount + 1;
-            if (activePlayersList.length - myRank <= 1) {
-                isGameOver = true;
-            }
         }
     }
+}
 
     discardPile.push(cardStr);
 
@@ -619,9 +628,12 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
 }
 
 window.acceptDrawStack = async function() {
-    if (gameState.turnState.currentTurnId !== playerId) return;
-    const drawCount = gameState.turnState.drawStack;
-    if (!drawCount || drawCount <= 0) return;
+if (gameState.turnState.currentTurnId !== playerId) return;
+    
+    document.getElementById('colorPicker').style.display = 'none';
+    pendingWildCard = null;
+
+    const drawCount = gameState.turnState.drawStack;    if (!drawCount || drawCount <= 0) return;
 
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
@@ -652,7 +664,11 @@ window.acceptDrawStack = async function() {
 };
 
 document.getElementById('deckPile').onclick = async () => {
-    if (gameState.turnState.currentTurnId !== playerId) return showToast("ليس دورك!");
+if (gameState.turnState.currentTurnId !== playerId) return showToast("ليس دورك!");
+    
+    document.getElementById('colorPicker').style.display = 'none';
+    pendingWildCard = null;
+
     if (gameState.turnState.drawStack > 0) return showToast("اضغط على (اسحب وتخطي الدور) لإنهاء التراكمات!");
 
     let deck = [...(gameState.deck || [])];
@@ -793,8 +809,12 @@ async function handleTimeoutPenalty(timedOutPlayerId) {
     if (!timedOutPlayer) return;
 
     const currentHand = timedOutPlayer.hand || [];
+    const drawStack = gameState.turnState.drawStack || 0;
     
-    const drawRes = extractCardsToDraw(1, deck, discardPile);
+    // تحديد كم سيتم سحبه: إما التراكم الموجود أو بطاقة واحدة كحد أدنى
+    const countToDraw = drawStack > 0 ? drawStack : 1;
+    
+    const drawRes = extractCardsToDraw(countToDraw, deck, discardPile);
     if (drawRes.drawnCards.length === 0) return;
     
     const newHand = currentHand.concat(drawRes.drawnCards);
@@ -812,18 +832,25 @@ async function handleTimeoutPenalty(timedOutPlayerId) {
     const timerSetting = parseInt(roomSettings.timer) || 0;
     const nextExpireAt = timerSetting > 0 ? (Date.now() + (timerSetting * 1000)) : null;
 
+    // بعد العقوبة، ينتقل الدور للاعب التالي ويصفر التراكم
     const nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
+    
     updates[`rooms/${roomId}/game/turnState`] = {
         currentTurnId: nextPlayerId,
         direction: gameState.turnState.direction,
         selectedColor: gameState.turnState.selectedColor || null,
-        drawStack: gameState.turnState.drawStack || 0,
+        drawStack: 0, // 👈 تصفير التراكم دائماً بعد السحب الإجباري
         lastUpdated: serverTimestamp(),
         expireAt: nextExpireAt
     };
 
+    // رسالة توضيحية للجميع
+    const reasonMsg = drawStack > 0 
+        ? `⏰ انتهى وقت ${timedOutPlayer.name} وسحب تراكم ${drawStack} بطاقات! 🃏`
+        : `⏰ انتهى وقت ${timedOutPlayer.name} وتم سحب بطاقة له!`;
+
     updates[`rooms/${roomId}/game/toastMessage`] = { 
-        msg: `⏰ انتهى وقت ${timedOutPlayer.name} وتم سحب بطاقة له!`, 
+        msg: reasonMsg, 
         time: Date.now() 
     };
 
@@ -1020,6 +1047,13 @@ window.closeChallengeModal = function(result) {
         challengeResolver = null;
     }
 };
+function formatDuration(ms) {
+    if (!ms) return "~";
+    const totalSeconds = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 function calculateHandPoints(hand) {
     let total = 0;
@@ -1027,12 +1061,15 @@ function calculateHandPoints(hand) {
     
     hand.forEach(cardStr => {
         const c = parseCard(cardStr);
-        if (c.isWild || c.isEraser || cardStr === "wildColor" || cardStr === "wildDrawFour") {
+        // الأوراق الخاصة والماسح و +4 تعطي 50 نقطة
+        if (c.isWild || c.isEraser || cardStr.includes("wild")) {
             total += 50;
         } 
-        else if (["⊘", "↻", "+2"].includes(c.value) || c.value === "+2") {
+        // أوراق الأكشن (تخطي، عكس، +2) تعطي 20 نقطة
+        else if (["⊘", "↻", "+2"].includes(c.value)) {
             total += 20;
         } 
+        // الأرقام العادية من 0-9
         else if (!isNaN(parseInt(c.value))) {
             total += parseInt(c.value);
         }
@@ -1055,7 +1092,8 @@ window.showLeaderboard = function() {
     const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
 
     if (isPointsMode) {
-        systemTypeElement.innerText = "نظام الفوز: النقاط (الترتيب بالرصيد الأصغر)";
+        // --- نظام النقاط (يبقى كما هو مع استبدال Moves بـ النقاط) ---
+        systemTypeElement.innerText = "نظام الفوز: النقاط";
         headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>النقاط</th>`;
         
         sortedPlayers.forEach(p => {
@@ -1068,50 +1106,50 @@ window.showLeaderboard = function() {
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
             const isLeaver = playersData[p.id]?.isLeaver;
-            
             const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
-            const playerName = isMe ? `${p.name} (أنت)` : p.name;
             const rankText = isLeaver ? 'منسحب' : (rankNames[idx] || (idx + 1));
-            const movesText = isLeaver ? '--' : `${p.movesCount} دور`;
             
             tbody.innerHTML += `
                 <tr class="${rowClass}">
                     <td>${rankText}</td>
-                    <td>${playerName}</td>
-                    <td>${movesText}</td>
+                    <td>${p.name}${isMe ? ' (أنت)' : ''}</td>
+                    <td>${isLeaver ? '--' : p.points}</td>
                 </tr>`;
         });
-        
+
     } else {
-        systemTypeElement.innerText = "نظام الفوز: التتابعي (الخروج المتسلسل)";
-        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>عدد الأدوار</th>`;
+        // --- النظام التتابعي (التعديل الجديد للوقت) ---
+        systemTypeElement.innerText = "نظام الفوز: التتابعي";
+        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>المدة</th>`;
         
         sortedPlayers.forEach(p => {
             const serverPlayer = playersData[p.id];
             p.finRank = p.finishedRank || 999;
-            p.hCount = serverPlayer ? (serverPlayer.handCount || 0) : 0;
-            p.movesCount = serverPlayer ? (serverPlayer.movesCount || 0) : 0;
+            p.finishTime = serverPlayer ? serverPlayer.finishTime : null;
         });
 
-        sortedPlayers.sort((a, b) => {
-            if (a.finRank !== b.finRank) {
-                return a.finRank - b.finRank;
-            }
-            return a.hCount - b.hCount; 
-        });
+        sortedPlayers.sort((a, b) => a.finRank - b.finRank);
         
         sortedPlayers.forEach((p, idx) => {
             const isMe = p.id === playerId;
-            const rowClass = isMe ? 'is-me-row' : '';
-            const playerName = isMe ? `${p.name} (أنت)` : p.name;
-            const rankText = rankNames[idx] || (idx + 1);
-            const movesText = `${p.movesCount} دور`;
+            const isLeaver = playersData[p.id]?.isLeaver;
+            const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
             
+            // تحديد النص الخاص بالوقت
+            let timeDisplayText = "~"; 
+            if (isLeaver) {
+                timeDisplayText = "انسحاب";
+            } else if (p.finishTime) {
+                timeDisplayText = formatDuration(p.finishTime);
+            }
+
+            const rankText = isLeaver ? 'مطرود' : (rankNames[idx] || (idx + 1));
+
             tbody.innerHTML += `
                 <tr class="${rowClass}">
                     <td>${rankText}</td>
-                    <td>${playerName}</td>
-                    <td>${movesText}</td>
+                    <td>${p.name}${isMe ? ' (أنت)' : ''}</td>
+                    <td style="font-family: monospace; font-weight: bold;">${timeDisplayText}</td>
                 </tr>`;
         });
     }

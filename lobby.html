@@ -1194,9 +1194,11 @@ window.handleStartGame = async function() {
 
     const startingPlayerId = activePlayers[startingPlayerIndex].id;
 
+
     const gameState = {
         deck,
         discardPile: [firstCard],
+        startTime: serverTimestamp(), // <--- أضف هذا السطر هنا
         turnState: {
             currentTurnId: startingPlayerId,
             direction: initialDirection,
@@ -1205,6 +1207,7 @@ window.handleStartGame = async function() {
             lastUpdated: serverTimestamp()
         }
     };
+
 
     try {
         await set(ref(db, `rooms/${roomId}/game`), gameState);
