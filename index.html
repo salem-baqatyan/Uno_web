@@ -8,6 +8,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="UNO! Pro">
+    <audio id="bgTrack" loop>
+    <source src="background_track.mp3" type="audio/mpeg">
+</audio>
     <style>
         :root {
             --bg-dark: #050505; 
@@ -477,6 +480,34 @@ window.createRoom = async () => {
             tbody.innerHTML = '<tr class="no-hover"><td colspan="4" style="text-align:center; padding:40px; color:#444;">لا توجد غرف عامة حالياً</td></tr>';
         }
     });
+
+    // --- منطق الموسيقى الخلفية ---
+const bgAudio = document.getElementById('bgTrack');
+bgAudio.volume = 0.4; // خفض الصوت قليلاً ليكون مناسباً كخلفية
+
+// دالة لتشغيل الموسيقى
+const startMusic = () => {
+    if (bgAudio.paused) {
+        bgAudio.play().catch(err => console.log("التشغيل التلقائي محجوب حتى الآن"));
+    }
+    // نزيل المستمعين بعد التشغيل الأول لعدم تكرار الطلب
+    document.removeEventListener('click', startMusic);
+    document.removeEventListener('touchstart', startMusic);
+};
+
+// تشغيل الموسيقى عند أول تفاعل للمستخدم (نقر أو لمس)
+document.addEventListener('click', startMusic);
+document.addEventListener('touchstart', startMusic);
+
+// إذا كان المستخدم قد تفاعل سابقاً في نفس الجلسة، حاول التشغيل فوراً
+if (sessionStorage.getItem('musicStarted')) {
+    bgAudio.play().catch(() => {});
+} else {
+    // بمجرد أن تبدأ الموسيقى، نخزن الحالة
+    bgAudio.onplay = () => {
+        sessionStorage.setItem('musicStarted', 'true');
+    };
+}
 </script>
 </body>
 </html>

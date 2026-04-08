@@ -7,6 +7,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="UNO! Pro">
+    <audio id="bgTrack" loop>
+    <source src="background_track.mp3" type="audio/mpeg">
+</audio>
     <title>UNO! Pro - Game</title>
     <style>
         /* --- الأساسيات --- */
@@ -32,10 +35,16 @@
         /* --- 1. App Bar --- */
         .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; flex-shrink: 0; z-index: 100; }
         .top-left, .top-right { display: flex; gap: 8px; align-items: center; }
-        .top-timer { color: white; font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', monospace; position: absolute; left: 50%; transform: translateX(-50%); }
+        .top-timer { 
+            color: white; font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', Courier, monospace; 
+            position: absolute; left: 50%; transform: translateX(-50%); text-shadow: 0 0 10px rgba(255, 0, 0, 0.3); 
+        }
         .icon-circle { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 0.5px solid white; cursor: pointer; color: white; }
         .btn-pill { background: rgba(255,255,255,0.1); border: 1px solid #444; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: white; }
-
+#gameTimer {
+    color: var(--uno-yellow);
+    text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+}
         /* --- 2. Arena --- */
         .game-area { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         .arena-center { width: 180px; height: 180px; background: rgba(255,255,255,0.03); border-radius: 50%; border: 2px dashed rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
@@ -212,7 +221,10 @@
     <div class="top-bar">
         <div class="top-left"><div class="icon-circle"><span id="playerCount">0</span> 👤</div><div class="btn-pill" id="roomDisplay">🔗 الغرفة</div></div>
         <div class="top-timer" id="gameTimer"></div>
-        <div class="top-right"><div class="btn-pill">📜القواعد</div><div class="icon-circle">⚙️</div></div>
+        <div class="top-right">
+            <!-- <div class="btn-pill">📜القواعد</div> -->
+            <div class="icon-circle">⚙️</div>
+        </div>
     </div>
 
     <div class="game-area">
@@ -1150,7 +1162,29 @@ window.showLeaderboard = function() {
     });
 
     modal.style.display = 'flex';
-    startLeaderboardCountdown();
+        
+    let timeLeft = 10;
+    const timerBar = document.getElementById('timer-bar');
+    const countdownText = document.getElementById('countdown-text');
+    const totalOffset = 176;
+
+    if (timerBar) timerBar.style.strokeDashoffset = 0;
+    if (countdownText) countdownText.innerText = timeLeft;
+
+    if (leaderboardInterval) clearInterval(leaderboardInterval);
+
+    leaderboardInterval = setInterval(async () => {
+        timeLeft--;
+        if (countdownText) countdownText.innerText = timeLeft;
+        if (timerBar) {
+            timerBar.style.strokeDashoffset = totalOffset - (timeLeft * (totalOffset / 10));
+        }
+        
+        if (timeLeft <= 0) {
+            clearInterval(leaderboardInterval);
+            await handleAutoTransition();
+        }
+    }, 1000);
 };
 
 async function handleAutoTransition() {
@@ -1183,6 +1217,33 @@ async function handleAutoTransition() {
     window.location.href = `lobby.html?r=${roomId}&p=${playerId}`;
 }
 
+// --- منطق الموسيقى الخلفية ---
+const bgAudio = document.getElementById('bgTrack');
+bgAudio.volume = 0.4; // خفض الصوت قليلاً ليكون مناسباً كخلفية
+
+// دالة لتشغيل الموسيقى
+const startMusic = () => {
+    if (bgAudio.paused) {
+        bgAudio.play().catch(err => console.log("التشغيل التلقائي محجوب حتى الآن"));
+    }
+    // نزيل المستمعين بعد التشغيل الأول لعدم تكرار الطلب
+    document.removeEventListener('click', startMusic);
+    document.removeEventListener('touchstart', startMusic);
+};
+
+// تشغيل الموسيقى عند أول تفاعل للمستخدم (نقر أو لمس)
+document.addEventListener('click', startMusic);
+document.addEventListener('touchstart', startMusic);
+
+// إذا كان المستخدم قد تفاعل سابقاً في نفس الجلسة، حاول التشغيل فوراً
+if (sessionStorage.getItem('musicStarted')) {
+    bgAudio.play().catch(() => {});
+} else {
+    // بمجرد أن تبدأ الموسيقى، نخزن الحالة
+    bgAudio.onplay = () => {
+        sessionStorage.setItem('musicStarted', 'true');
+    };
+}
 </script>
 </body>
 </html>
