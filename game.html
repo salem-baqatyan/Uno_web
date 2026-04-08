@@ -562,25 +562,27 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
         if (isPointsMode) {
             isGameOver = true;
         } else {
-            const currentFinishedCount = activePlayersList.filter(p => p.finishedRank && p.finishedRank !== 999).length;
+            const currentFinishedCount = activePlayersList.filter(p => p.finishedRank).length;
             const myRank = currentFinishedCount + 1;
             
             updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
+            // تسجيل وقت النهاية للفائز فقط
             if (gameState.startTime) {
                 updates[`rooms/${roomId}/players/${playerId}/finishTime`] = now - gameState.startTime;
             }
-
-            if (activePlayersList.length - (currentFinishedCount + 1) <= 1) {
+            // داخل executeMove عند myHand.length === 0
+            if (activePlayersList.length - myRank <= 1) {
                 isGameOver = true;
-                // اللاعب الأخير الذي لم ينهِ ولم ينسحب
                 const loser = activePlayersList.find(p => p.id !== playerId && !p.finishedRank);
                 if (loser) {
-                    updates[`rooms/${roomId}/players/${loser.id}/finishedRank`] = 888; // رتبة الخاسر الأخير
+                    // رتبة "الخاسر الأخير" لكنه ليس منسحباً
+                    updates[`rooms/${roomId}/players/${loser.id}/finishedRank`] = 888; 
                 }
             }
         }
     }
-        // تجهيز تحديثات اللاعب الحالي
+
+    // تجهيز تحديثات اللاعب الحالي
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
     updates[`rooms/${roomId}/players/${playerId}/movesCount`] = (playersData[playerId].movesCount || 0) + 1;
@@ -758,13 +760,14 @@ onValue(gameRef, (snap) => {
     gameState = snap.val();
     if (!gameState) return;
 
-    const loader = document.getElementById('loadingScreen');
-    if (loader) loader.style.display = 'none';
-
     if (gameState.status === 'finished') {
         if (gameTimerInterval) clearInterval(gameTimerInterval);
         document.getElementById('gameTimer').innerText = ''; 
-        showLeaderboard();
+        
+        // 🚨 إضافة تأخير بسيط لضمان وصول بيانات finishTime للفائز
+        setTimeout(() => {
+            showLeaderboard();
+        }, 600); 
     } else {
         renderGame();
         
@@ -1095,104 +1098,59 @@ window.showLeaderboard = function() {
     tbody.innerHTML = '';
     const rankNames = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر"];
 
-    // جلب البيانات الطازجة من السيرفر مباشرة لكل اللاعبين
+    // تجهيز البيانات من مصدر الحقيقة (playersData)
     let pList = activePlayersList.map(p => {
         const s = playersData[p.id] || {};
         return {
             ...p,
-            finRank: s.finishedRank || 777, // لاعب ما زال يلعب (حالة نادرة هنا)
+            finRank: s.finishedRank || 999,
             finishTime: s.finishTime || null,
-            isLeaver: s.isLeaver || false
+            isLeaver: s.isLeaver || false,
+            points: isPointsMode ? calculateHandPoints(s.hand) : 0
         };
     });
 
-    if (isPointsMode) {
-        // --- نظام النقاط (يبقى كما هو مع استبدال Moves بـ النقاط) ---
-        systemTypeElement.innerText = "نظام الفوز: النقاط";
-        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>النقاط</th>`;
-        
-        sortedPlayers.forEach(p => {
-            const serverPlayer = playersData[p.id];
-            p.points = calculateHandPoints(serverPlayer ? serverPlayer.hand : []);
-        });
-        
-        sortedPlayers.sort((a, b) => a.points - b.points);
-        
-        sortedPlayers.forEach((p, idx) => {
-            const isMe = p.id === playerId;
-            const isLeaver = playersData[p.id]?.isLeaver;
-            const rowClass = isMe ? 'is-me-row' : (isLeaver ? 'is-leaver-row' : '');
-            const rankText = isLeaver ? 'منسحب' : (rankNames[idx] || (idx + 1));
-            
-            tbody.innerHTML += `
-                <tr class="${rowClass}">
-                    <td>${rankText}</td>
-                    <td>${p.name}${isMe ? ' (أنت)' : ''}</td>
-                    <td>${isLeaver ? '--' : p.points}</td>
-                </tr>`;
-        });
+    // الترتيب: الفائزين -> الخاسر الأخير -> المنسحبين
+    pList.sort((a, b) => {
+        if (a.isLeaver !== b.isLeaver) return a.isLeaver ? 1 : -1;
+        if (isPointsMode) return a.points - b.points;
+        return a.finRank - b.finRank;
+    });
 
-} else {
-        // --- النظام التتابعي ---
-        systemTypeElement.innerText = "نظام الفوز: التتابعي";
-        headers.innerHTML = `<th>الترتيب</th><th>اللاعب</th><th>المدة</th>`;
-        
-        // نستخدم playersData مباشرة لضمان أحدث القيم من السيرفر
-        pList.sort((a, b) => {
-            if (a.isLeaver !== b.isLeaver) return a.isLeaver ? 1 : -1;
-            return a.finRank - b.finRank;
-        });
+    // ضبط العناوين
+    headers.innerHTML = isPointsMode ? 
+        `<th>الترتيب</th><th>اللاعب</th><th>النقاط</th>` : 
+        `<th>الترتيب</th><th>اللاعب</th><th>المدة</th>`;
+    systemTypeElement.innerText = isPointsMode ? "نظام الفوز: النقاط" : "نظام الفوز: التتابعي";
 
-        pList.forEach((p, idx) => {
-            const isMe = p.id === playerId;
-            const rowClass = isMe ? 'is-me-row' : (p.isLeaver ? 'is-leaver-row' : '');
-            
-            let timeText = "-";
-            let rankText = rankNames[idx] || (idx + 1);
+    pList.forEach((p, idx) => {
+        const isMe = p.id === playerId;
+        let rowStyle = "";
+        let rankText = rankNames[idx] || (idx + 1);
+        let valueText = "-";
 
-            if (p.isLeaver) {
-                rankText = "منسحب";
-                timeText = "إنسحاب";
-            } else if (p.finishTime) {
-                timeText = formatDuration(p.finishTime);
-            } else if (p.finRank === 888) {
-                // الخاسر الأخير
-                timeText = "-";
+        if (p.isLeaver) {
+            rowStyle = "opacity: 0.4; filter: grayscale(1); background: rgba(255,255,255,0.05);";
+            rankText = "منسحب";
+        } else {
+            if (isPointsMode) {
+                valueText = p.points;
+            } else {
+                // الفائز فقط من لديه finishTime سيظهر وقته
+                valueText = p.finishTime ? formatDuration(p.finishTime) : "-";
             }
+        }
 
-            tbody.innerHTML += `
-                <tr class="${rowClass}">
-                    <td>${rankText}</td>
-                    <td>${p.name}${isMe ? ' (أنت)' : ''}</td>
-                    <td style="font-family: monospace; font-weight: bold;">${timeText}</td>
-                </tr>`;
-        });
-    }
-    
+        tbody.innerHTML += `
+            <tr class="${isMe ? 'is-me-row' : ''}" style="${rowStyle}">
+                <td>${rankText}</td>
+                <td>${p.name}${isMe ? ' (أنت)' : ''}</td>
+                <td style="font-family: monospace; font-weight: bold;">${valueText}</td>
+            </tr>`;
+    });
+
     modal.style.display = 'flex';
-        
-    let timeLeft = 10;
-    const timerBar = document.getElementById('timer-bar');
-    const countdownText = document.getElementById('countdown-text');
-    const totalOffset = 176;
-
-    if (timerBar) timerBar.style.strokeDashoffset = 0;
-    if (countdownText) countdownText.innerText = timeLeft;
-
-    if (leaderboardInterval) clearInterval(leaderboardInterval);
-
-    leaderboardInterval = setInterval(async () => {
-        timeLeft--;
-        if (countdownText) countdownText.innerText = timeLeft;
-        if (timerBar) {
-            timerBar.style.strokeDashoffset = totalOffset - (timeLeft * (totalOffset / 10));
-        }
-        
-        if (timeLeft <= 0) {
-            clearInterval(leaderboardInterval);
-            await handleAutoTransition();
-        }
-    }, 1000);
+    startLeaderboardCountdown();
 };
 
 async function handleAutoTransition() {
