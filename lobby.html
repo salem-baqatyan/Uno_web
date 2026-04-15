@@ -444,8 +444,6 @@ input:disabled + .slider {
     </div>
 </div>
 <!-- Strings Imports -->
-<script src="/strings/basic_words.js"></script>
-<script src="/strings/advanced_words.js"></script>
 <script src="/strings/rules.js"></script>
 
 <!-- JS Section -->
@@ -1279,33 +1277,33 @@ document.getElementById('nicknameInput').addEventListener('keypress', (e) => { i
 
 vacuumCleaner();
 
-// --- منطق الموسيقى الخلفية ---
-const bgAudio = document.getElementById('bgTrack');
-bgAudio.volume = 0.4; // خفض الصوت قليلاً ليكون مناسباً كخلفية
+// // --- منطق الموسيقى الخلفية ---
+// const bgAudio = document.getElementById('bgTrack');
+// bgAudio.volume = 0.4; // خفض الصوت قليلاً ليكون مناسباً كخلفية
 
-// دالة لتشغيل الموسيقى
-const startMusic = () => {
-    if (bgAudio.paused) {
-        bgAudio.play().catch(err => console.log("التشغيل التلقائي محجوب حتى الآن"));
-    }
-    // نزيل المستمعين بعد التشغيل الأول لعدم تكرار الطلب
-    document.removeEventListener('click', startMusic);
-    document.removeEventListener('touchstart', startMusic);
-};
+// // دالة لتشغيل الموسيقى
+// const startMusic = () => {
+//     if (bgAudio.paused) {
+//         bgAudio.play().catch(err => console.log("التشغيل التلقائي محجوب حتى الآن"));
+//     }
+//     // نزيل المستمعين بعد التشغيل الأول لعدم تكرار الطلب
+//     document.removeEventListener('click', startMusic);
+//     document.removeEventListener('touchstart', startMusic);
+// };
 
-// تشغيل الموسيقى عند أول تفاعل للمستخدم (نقر أو لمس)
-document.addEventListener('click', startMusic);
-document.addEventListener('touchstart', startMusic);
+// // تشغيل الموسيقى عند أول تفاعل للمستخدم (نقر أو لمس)
+// document.addEventListener('click', startMusic);
+// document.addEventListener('touchstart', startMusic);
 
-// إذا كان المستخدم قد تفاعل سابقاً في نفس الجلسة، حاول التشغيل فوراً
-if (sessionStorage.getItem('musicStarted')) {
-    bgAudio.play().catch(() => {});
-} else {
-    // بمجرد أن تبدأ الموسيقى، نخزن الحالة
-    bgAudio.onplay = () => {
-        sessionStorage.setItem('musicStarted', 'true');
-    };
-}
+// // إذا كان المستخدم قد تفاعل سابقاً في نفس الجلسة، حاول التشغيل فوراً
+// if (sessionStorage.getItem('musicStarted')) {
+//     bgAudio.play().catch(() => {});
+// } else {
+//     // بمجرد أن تبدأ الموسيقى، نخزن الحالة
+//     bgAudio.onplay = () => {
+//         sessionStorage.setItem('musicStarted', 'true');
+//     };
+// }
 </script>
 </body>
 </html>

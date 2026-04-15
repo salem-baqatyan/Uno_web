@@ -213,6 +213,14 @@
     font-size: 1.2rem;
     color: white;
 }
+/* أضف هذا في قسم الـ <style> */
+.is-disconnected-gray {
+    filter: grayscale(100%);
+    opacity: 0.6;
+}
+.is-disconnected-gray .player-name {
+    color: #ff4d4d !important;
+}
 </style>
 </head>
 <body>
@@ -727,39 +735,7 @@ onValue(playersRef, (snap) => {
         
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
     
-    if (gameState && gameState.status !== 'finished') {
-        const now = Date.now();
-        const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
-
-        // فلترة اللاعبين المتصلين فعلياً والذين لم ينتهوا بعد
-        const onlinePlayers = activePlayersList.filter(p => !p.isDisconnected && !p.finishedRank);
-
-        // 🚨 الحل الذكي لطلبك: لو ما بقي في الروم إلا أنت شغال والآخرين انقطعوا، ننهي القيم فوراً!
-        if (onlinePlayers.length === 1 && activePlayersList.length > 1) {
-             const updates = {};
-             updates[`rooms/${roomId}/game/status`] = 'finished';
-             
-             // نضع اللاعب المتبقي في المركز الأول
-             updates[`rooms/${roomId}/players/${onlinePlayers[0].id}/finishedRank`] = 1;
-             
-             // تحديث السيرفر ليرى الجميع شاشة النهاية
-             update(ref(db), updates);
-             showToast("انقطع الخصم! انتهت اللعبة بفوزك 🏆");
-             return; 
-        }
-        
-        // فحص الـ 30 ثانية القديم (للرومات التي فيها أكثر من لاعبين)
-        activePlayersList.forEach(p => {
-            if (p.isDisconnected && p.disconnectTime) {
-                const elapsed = Math.floor((now - p.disconnectTime) / 1000);
-                
-                if (elapsed >= 30 && isAdmin) {
-                    handleLeaverLogic(p.id);
-                }
-            }
-        });
-    }
-
+    // إزالة منطق الطرد تماماً من هنا
     renderGame();
 });
 
@@ -775,14 +751,26 @@ onValue(gameRef, (snap) => {
     if (gameState.status === 'finished') {
         if (gameTimerInterval) clearInterval(gameTimerInterval);
         document.getElementById('gameTimer').innerText = ''; 
-        
-        // 🚨 إضافة تأخير بسيط لضمان وصول بيانات finishTime للفائز
-        setTimeout(() => {
-            showLeaderboard();
-        }, 600); 
+        setTimeout(() => { showLeaderboard(); }, 600); 
     } else {
         renderGame();
-        
+
+        // --- منطق التخطي التلقائي للمفصولين ---
+        const currentTurnId = gameState.turnState.currentTurnId;
+        const currentPlayer = playersData[currentTurnId];
+
+        if (currentPlayer && currentPlayer.isDisconnected) {
+            // من الذي سيقوم بعملية التخطي؟ (أول لاعب متصل متاح)
+            const firstOnlinePlayer = activePlayersList.find(p => !p.isDisconnected);
+            
+            if (firstOnlinePlayer && firstOnlinePlayer.id === playerId) {
+                // أنا أول واحد متصل، سأقوم بمهمة تخطي هذا اللاعب المفصول
+                console.log(`اللاعب ${currentPlayer.name} مفصول، أقوم بتخطيه...`);
+                handleTimeoutPenalty(currentTurnId);
+            }
+        }
+        // ---------------------------------------
+
         const timerSetting = parseInt(roomSettings.timer) || 0;
         if (timerSetting > 0 && gameState.turnState && gameState.turnState.expireAt) {
             startTurnTimer(gameState.turnState.expireAt);
@@ -940,12 +928,9 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         let disconnectClass = '';
         let timerHTML = '';
         
-        if (p.isDisconnected && p.disconnectTime) {
-            disconnectClass = 'is-disconnected-gray';
-            // ✂️ تم حذف توليد timerHTML لكي لا تظهر أرقام غبية معلقة 29 و 30
-        }        
-        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${disconnectClass}`;
-        
+        // داخل دالة layoutPlayers
+        const isDisconnected = p.isDisconnected ? 'is-disconnected-gray' : '';
+        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${isDisconnected}`;        
         if (pos.side === 'left') {
             seat.style.cssText = `top: ${pos.top}%; left: ${pos.left}px; transform: translateY(-50%);`;
         } else if (pos.side === 'right') {
@@ -967,41 +952,6 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
 
     document.getElementById('playerCount').innerText = count;
 };
-
-async function handleLeaverLogic(leaverId) {
-    const updates = {};
-    const leaver = playersData[leaverId];
-    if (!leaver || leaver.team === "spectators-list") return; 
-
-    let deck = [...(gameState.deck || [])];
-    const leaverHand = leaver.hand || [];
-
-    deck = leaverHand.concat(deck);
-    updates[`rooms/${roomId}/game/deck`] = deck;
-
-    updates[`rooms/${roomId}/players/${leaverId}/team`] = "spectators-list";
-    updates[`rooms/${roomId}/players/${leaverId}/slot`] = null;
-    updates[`rooms/${roomId}/players/${leaverId}/hand`] = null;
-    updates[`rooms/${roomId}/players/${leaverId}/handCount`] = 0;
-    updates[`rooms/${roomId}/players/${leaverId}/finishedRank`] = 999;
-    updates[`rooms/${roomId}/players/${leaverId}/isLeaver`] = true;
-
-    const remainingPlayers = activePlayersList.filter(p => p.id !== leaverId && !p.finishedRank);
-    
-    if (remainingPlayers.length === 1) {
-        updates[`rooms/${roomId}/game/status`] = 'finished';
-        updates[`rooms/${roomId}/players/${remainingPlayers[0].id}/finishedRank`] = 1;
-    } else {
-        if (gameState.turnState.currentTurnId === leaverId) {
-            let nextPlayerId = getNextPlayerId(false, gameState.turnState.direction);
-            updates[`rooms/${roomId}/game/turnState/currentTurnId`] = nextPlayerId;
-            updates[`rooms/${roomId}/game/turnState/lastUpdated`] = serverTimestamp();
-        }
-    }
-
-    await update(ref(db), updates);
-    showToast(`🚫 اللاعب ${leaver.name} انسحب لقطع الاتصال!`);
-}
 
 window.handleChallenge = async function(targetId) {
     if (targetId === playerId) return; 
@@ -1217,33 +1167,33 @@ async function handleAutoTransition() {
     window.location.href = `lobby.html?r=${roomId}&p=${playerId}`;
 }
 
-// --- منطق الموسيقى الخلفية ---
-const bgAudio = document.getElementById('bgTrack');
-bgAudio.volume = 0.4; // خفض الصوت قليلاً ليكون مناسباً كخلفية
+// // --- منطق الموسيقى الخلفية ---
+// const bgAudio = document.getElementById('bgTrack');
+// bgAudio.volume = 0.4; // خفض الصوت قليلاً ليكون مناسباً كخلفية
 
-// دالة لتشغيل الموسيقى
-const startMusic = () => {
-    if (bgAudio.paused) {
-        bgAudio.play().catch(err => console.log("التشغيل التلقائي محجوب حتى الآن"));
-    }
-    // نزيل المستمعين بعد التشغيل الأول لعدم تكرار الطلب
-    document.removeEventListener('click', startMusic);
-    document.removeEventListener('touchstart', startMusic);
-};
+// // دالة لتشغيل الموسيقى
+// const startMusic = () => {
+//     if (bgAudio.paused) {
+//         bgAudio.play().catch(err => console.log("التشغيل التلقائي محجوب حتى الآن"));
+//     }
+//     // نزيل المستمعين بعد التشغيل الأول لعدم تكرار الطلب
+//     document.removeEventListener('click', startMusic);
+//     document.removeEventListener('touchstart', startMusic);
+// };
 
-// تشغيل الموسيقى عند أول تفاعل للمستخدم (نقر أو لمس)
-document.addEventListener('click', startMusic);
-document.addEventListener('touchstart', startMusic);
+// // تشغيل الموسيقى عند أول تفاعل للمستخدم (نقر أو لمس)
+// document.addEventListener('click', startMusic);
+// document.addEventListener('touchstart', startMusic);
 
-// إذا كان المستخدم قد تفاعل سابقاً في نفس الجلسة، حاول التشغيل فوراً
-if (sessionStorage.getItem('musicStarted')) {
-    bgAudio.play().catch(() => {});
-} else {
-    // بمجرد أن تبدأ الموسيقى، نخزن الحالة
-    bgAudio.onplay = () => {
-        sessionStorage.setItem('musicStarted', 'true');
-    };
-}
+// // إذا كان المستخدم قد تفاعل سابقاً في نفس الجلسة، حاول التشغيل فوراً
+// if (sessionStorage.getItem('musicStarted')) {
+//     bgAudio.play().catch(() => {});
+// } else {
+//     // بمجرد أن تبدأ الموسيقى، نخزن الحالة
+//     bgAudio.onplay = () => {
+//         sessionStorage.setItem('musicStarted', 'true');
+//     };
+// }
 </script>
 </body>
 </html>
