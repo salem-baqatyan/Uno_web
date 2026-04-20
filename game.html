@@ -735,7 +735,23 @@ onValue(playersRef, (snap) => {
         
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
     
-    // إزالة منطق الطرد تماماً من هنا
+    // --- منطق التخطي التلقائي عند استشعار انقطاع الاتصال ---
+    if (gameState && gameState.status !== 'finished') {
+        const currentTurnId = gameState.turnState.currentTurnId;
+        const currentPlayer = playersData[currentTurnId];
+
+        // إذا كان اللاعب الذي عليه الدور قد فصل الآن
+        if (currentPlayer && currentPlayer.isDisconnected) {
+            // البحث عن أول لاعب متصل للقيام بالمهمة
+            const firstOnlinePlayer = activePlayersList.find(p => !p.isDisconnected);
+            
+            if (firstOnlinePlayer && firstOnlinePlayer.id === playerId) {
+                console.log(`تنبيه: اللاعب ${currentPlayer.name} انفصل أثناء دوره. جاري التخطي...`);
+                handleTimeoutPenalty(currentTurnId);
+            }
+        }
+    }
+    
     renderGame();
 });
 
