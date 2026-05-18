@@ -24,6 +24,17 @@
         }
 
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        /* منع التحديد والسحب في اللعبة */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+
+    -webkit-touch-callout: none;
+}
+
         body { margin: 0; background-color: var(--bg-dark); color: white; display: flex; justify-content: center; align-items: center; height: 100dvh; overflow: hidden; }
 
         .mobile-wrapper {
@@ -607,6 +618,27 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
     updates[`rooms/${roomId}/players/${playerId}/movesCount`] = (playersData[playerId].movesCount || 0) + 1;
 
+    // تنفيذ عقوبة UNO المعلقة بعد انتهاء الدور
+if (playersData[playerId].pendingUnoPenalty === true) {
+
+    const penaltyDraw = extractCardsToDraw(1, deck, discardPile);
+
+    deck = penaltyDraw.deck;
+    discardPile = penaltyDraw.discard;
+
+    myHand = myHand.concat(penaltyDraw.drawnCards);
+
+    updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
+    updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
+
+    // حذف العقوبة بعد التنفيذ
+    updates[`rooms/${roomId}/players/${playerId}/pendingUnoPenalty`] = null;
+
+    updates[`rooms/${roomId}/game/toastMessage`] = {
+        msg: `⚠️ تم تنفيذ عقوبة اعتراض UNO الخاطئ على ${playersData[playerId].name}`,
+        time: Date.now()
+    };
+}
     // حساب اللاعب التالي
     let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
 
@@ -734,24 +766,26 @@ onValue(playersRef, (snap) => {
         .sort((a, b) => parseInt(a.slot.split('-')[1]) - parseInt(b.slot.split('-')[1]));
         
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
-    
-    // --- منطق التخطي التلقائي عند استشعار انقطاع الاتصال ---
-    if (gameState && gameState.status !== 'finished') {
+
+    if (gameState && gameState.status !== 'finished' && gameState.turnState) {
         const currentTurnId = gameState.turnState.currentTurnId;
         const currentPlayer = playersData[currentTurnId];
 
-        // إذا كان اللاعب الذي عليه الدور قد فصل الآن
         if (currentPlayer && currentPlayer.isDisconnected) {
-            // البحث عن أول لاعب متصل للقيام بالمهمة
             const firstOnlinePlayer = activePlayersList.find(p => !p.isDisconnected);
             
             if (firstOnlinePlayer && firstOnlinePlayer.id === playerId) {
-                console.log(`تنبيه: اللاعب ${currentPlayer.name} انفصل أثناء دوره. جاري التخطي...`);
-                handleTimeoutPenalty(currentTurnId);
+                console.log(`⚠️ اللاعب ${currentPlayer.name} انقطع اتصاله أثناء دوره! جاري التخطي...`);
+                
+                setTimeout(() => {
+                    if (playersData[currentTurnId] && playersData[currentTurnId].isDisconnected) {
+                         handleTimeoutPenalty(currentTurnId);
+                    }
+                }, 1000);
             }
         }
     }
-    
+
     renderGame();
 });
 
@@ -989,17 +1023,22 @@ window.handleChallenge = async function(targetId) {
     const updates = {};
     let drawRes;
 
-    if (targetPlayer.saidUno === true) {
-        drawRes = extractCardsToDraw(1, deck, discardPile);
-        myHand = myHand.concat(drawRes.drawnCards);
-        updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
-        updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
-        
-        updates[`rooms/${roomId}/game/toastMessage`] = { 
-            msg: `❌ اعتراض خاطئ! ${targetPlayer.name} سبق وقال UNO.`, 
-            time: Date.now() 
-        };
-    } else {
+if (targetPlayer.saidUno === true) {
+
+    // منع استغلال الاعتراض المتكرر
+    if (playersData[playerId].pendingUnoPenalty) {
+        return showToast("لديك بالفعل عقوبة UNO معلقة!");
+    }
+
+    // تسجيل عقوبة معلقة فقط
+    updates[`rooms/${roomId}/players/${playerId}/pendingUnoPenalty`] = true;
+
+    updates[`rooms/${roomId}/game/toastMessage`] = { 
+        msg: `❌ اعتراض خاطئ! سيتم سحب بطاقة لك بعد انتهاء دورك.`,
+        time: Date.now() 
+    };
+}
+     else {
         drawRes = extractCardsToDraw(2, deck, discardPile);
         let targetHand = (targetPlayer.hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetId}/hand`] = targetHand;
