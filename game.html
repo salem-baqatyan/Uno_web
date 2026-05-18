@@ -47,15 +47,12 @@
         .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; flex-shrink: 0; z-index: 100; }
         .top-left, .top-right { display: flex; gap: 8px; align-items: center; }
         .top-timer { 
-            color: white; font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', Courier, monospace; 
-            position: absolute; left: 50%; transform: translateX(-50%); text-shadow: 0 0 10px rgba(255, 0, 0, 0.3); 
+            color: var(--uno-yellow); font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', Courier, monospace; 
+            position: absolute; left: 50%; transform: translateX(-50%); text-shadow: 0 0 10px rgba(255, 0, 0, 0.3); text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
         }
         .icon-circle { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 0.5px solid white; cursor: pointer; color: white; }
         .btn-pill { background: rgba(255,255,255,0.1); border: 1px solid #444; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: white; }
-#gameTimer {
-    color: var(--uno-yellow);
-    text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
-}
+
         /* --- 2. Arena --- */
         .game-area { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         .arena-center { width: 180px; height: 180px; background: rgba(255,255,255,0.03); border-radius: 50%; border: 2px dashed rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
@@ -617,25 +614,24 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
     updates[`rooms/${roomId}/players/${playerId}/movesCount`] = (playersData[playerId].movesCount || 0) + 1;
-
-    // تنفيذ عقوبة UNO المعلقة بعد انتهاء الدور
-if (playersData[playerId].pendingUnoPenalty === true) {
+// تنفيذ عقوبة الاعتراض الخاطئ المؤجلة
+if (playersData[playerId].pendingChallengePenalty) {
 
     const penaltyDraw = extractCardsToDraw(1, deck, discardPile);
 
     deck = penaltyDraw.deck;
     discardPile = penaltyDraw.discard;
 
-    myHand = myHand.concat(penaltyDraw.drawnCards);
+    myHand.push(...penaltyDraw.drawnCards);
 
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
 
-    // حذف العقوبة بعد التنفيذ
-    updates[`rooms/${roomId}/players/${playerId}/pendingUnoPenalty`] = null;
+    // حذف العقوبة بعد تنفيذها
+    updates[`rooms/${roomId}/players/${playerId}/pendingChallengePenalty`] = null;
 
     updates[`rooms/${roomId}/game/toastMessage`] = {
-        msg: `⚠️ تم تنفيذ عقوبة اعتراض UNO الخاطئ على ${playersData[playerId].name}`,
+        msg: `⚠️ تم تنفيذ عقوبة الاعتراض الخاطئ على ${playersData[playerId].name}`,
         time: Date.now()
     };
 }
@@ -840,17 +836,22 @@ function startTurnTimer(expireAt) {
         const timeLeft = Math.ceil((expireAt - now) / 1000);
 
         if (timeLeft > 0) {
-            timerElement.innerText = `${timeLeft}`;
+            // تنسيق الوقت ليظهر 00:15 بدلاً من 15 فقط (اختياري حسب رغبتك)
+            const seconds = timeLeft < 10 ? `0${timeLeft}` : timeLeft;
+            timerElement.innerText = `00:${seconds}`;
+
             if (timeLeft <= 5) {
+                // حالة الخطر: أحمر
                 timerElement.style.color = '#ff4d4d';
-                timerElement.style.fontWeight = 'bold';
+                timerElement.style.textShadow = '0 0 10px rgba(255, 0, 0, 0.5)';
             } else {
-                timerElement.style.color = 'white';
-                timerElement.style.fontWeight = 'normal';
+                // الحالة العادية: أصفر (نفس اللوبي)
+                timerElement.style.color = 'var(--uno-yellow)'; 
+                timerElement.style.textShadow = '0 0 10px rgba(255, 170, 0, 0.3)';
             }
         } else {
             clearInterval(gameTimerInterval);
-            timerElement.innerText = `0`;
+            timerElement.innerText = `00:00`;
             
             const isAdmin = (activePlayersList.length > 0 && playerId === activePlayersList[0].id);
             if (isAdmin) {
@@ -859,7 +860,6 @@ function startTurnTimer(expireAt) {
         }
     }, 1000);
 }
-
 async function handleTimeoutPenalty(timedOutPlayerId) {
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
@@ -1025,20 +1025,20 @@ window.handleChallenge = async function(targetId) {
 
 if (targetPlayer.saidUno === true) {
 
-    // منع استغلال الاعتراض المتكرر
-    if (playersData[playerId].pendingUnoPenalty) {
-        return showToast("لديك بالفعل عقوبة UNO معلقة!");
+    // منع تكرار العقوبة أكثر من مرة بنفس الدور
+    if (playersData[playerId].pendingChallengePenalty) {
+        return showToast("لقد تمت معاقبتك مسبقاً بهذا الدور!");
     }
 
-    // تسجيل عقوبة معلقة فقط
-    updates[`rooms/${roomId}/players/${playerId}/pendingUnoPenalty`] = true;
+    // تسجيل عقوبة مؤجلة بدلاً من إعطاء البطاقة فوراً
+    updates[`rooms/${roomId}/players/${playerId}/pendingChallengePenalty`] = true;
 
     updates[`rooms/${roomId}/game/toastMessage`] = { 
-        msg: `❌ اعتراض خاطئ! سيتم سحب بطاقة لك بعد انتهاء دورك.`,
+        msg: `❌ اعتراض خاطئ! سيتم سحب بطاقة لك بعد انتهاء دورك.`, 
         time: Date.now() 
     };
 }
-     else {
+    else {
         drawRes = extractCardsToDraw(2, deck, discardPile);
         let targetHand = (targetPlayer.hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetId}/hand`] = targetHand;
@@ -1204,8 +1204,8 @@ async function handleAutoTransition() {
         [`rooms/${roomId}/players/${playerId}/handCount`]: null,
         [`rooms/${roomId}/players/${playerId}/finishedRank`]: null,
         [`rooms/${roomId}/players/${playerId}/saidUno`]: null,
-        [`rooms/${roomId}/players/${playerId}/movesCount`]: null
-    };
+[`rooms/${roomId}/players/${playerId}/movesCount`]: null,
+[`rooms/${roomId}/players/${playerId}/pendingChallengePenalty`]: null    };
     await update(ref(db), playerUpdates);
 
     if (isAdmin) {
