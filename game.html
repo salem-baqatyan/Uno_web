@@ -48,11 +48,14 @@
         .top-left, .top-right { display: flex; gap: 8px; align-items: center; }
         .top-timer { 
             color: var(--uno-yellow); font-size: 1.5rem; font-weight: 900; font-family: 'Courier New', Courier, monospace; 
-            position: absolute; left: 50%; transform: translateX(-50%); text-shadow: 0 0 10px rgba(255, 0, 0, 0.3); text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+            position: absolute; left: 50%; transform: translateX(-50%); text-shadow: 0 0 10px rgba(255, 0, 0, 0.3); 
         }
         .icon-circle { width: 40px; height: 40px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 0.5px solid white; cursor: pointer; color: white; }
         .btn-pill { background: rgba(255,255,255,0.1); border: 1px solid #444; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; cursor: pointer; color: white; }
-
+#gameTimer {
+    color: var(--uno-yellow);
+    text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+}
         /* --- 2. Arena --- */
         .game-area { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
         .arena-center { width: 180px; height: 180px; background: rgba(255,255,255,0.03); border-radius: 50%; border: 2px dashed rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; gap: 15px; position: relative; }
@@ -532,15 +535,13 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     document.getElementById('colorPicker').style.display = 'none'; 
     
     const card = parseCard(cardStr);    
-    // تعريف دقيق لبطاقات الأكشن
     const isActionCard = card.value === "⊘" || 
                          card.value === "↻" || 
                          card.value === "+2" || 
                          card.value === "+4" || 
-                         card.type === "wildColor" || 
+                         card.value === "wildColor" || 
                          card.isEraser;
 
-    // القيد: لا يسمح بأن تكون البطاقة الأخيرة أكشن (فقط إذا كان النظام ليس نقاط)
     const isPointsMode = roomSettings.points === true;
     if (myHand.length === 1 && isActionCard && !isPointsMode) {
         return showToast("🚫 لا يمكنك الفوز ببطاقة أكشن، يجب أن تكون بطاقتك الأخيرة رقماً.");
@@ -553,7 +554,6 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     const playersStillPlaying = activePlayersList.filter(p => !p.finishedRank).length;
     let newDrawStack = (gameState.turnState.drawStack || 0);
     
-    // منطق بطاقات الأكشن
     if (card.isEraser) {
         newDrawStack = 0; 
     } else {
@@ -573,11 +573,9 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
         newDrawStack += addedStack;
     }
 
-    // تحديث المصفوفات المحلية قبل الرفع للسيرفر
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
     
-    // إزالة البطاقة من اليد
     myHand.splice(cardIndex, 1);
     discardPile.push(cardStr);
 
@@ -585,7 +583,18 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
     let isGameOver = false;
     const now = Date.now();
 
-    // 1. إذا أنهى اللاعب الحالي أوراقه (هو فائز حالياً)
+    // 🔥 [جديد] تطبيق العقوبة المؤجلة للاعب الحالي عند إنهاء دوره (إذا وجدت)
+    const currentPlayerData = playersData[playerId] || {};
+    if (currentPlayerData.pendingPenalty === true) {
+        const penaltyRes = extractCardsToDraw(1, deck, discardPile);
+        deck = penaltyRes.deck;
+        discardPile = penaltyRes.discard;
+        myHand = myHand.concat(penaltyRes.drawnCards); // إضافتها لليد الحالية للاعب
+        
+        // إلغاء العقوبة المعلقة حتى لا تتكرر
+        updates[`rooms/${roomId}/players/${playerId}/pendingPenalty`] = null; 
+    }
+
     if (myHand.length === 0) {
         if (isPointsMode) {
             isGameOver = true;
@@ -594,53 +603,27 @@ async function executeMove(cardStr, cardIndex, chosenColor) {
             const myRank = currentFinishedCount + 1;
             
             updates[`rooms/${roomId}/players/${playerId}/finishedRank`] = myRank;
-            // تسجيل وقت النهاية للفائز فقط
             if (gameState.startTime) {
                 updates[`rooms/${roomId}/players/${playerId}/finishTime`] = now - gameState.startTime;
             }
-            // داخل executeMove عند myHand.length === 0
             if (activePlayersList.length - myRank <= 1) {
                 isGameOver = true;
                 const loser = activePlayersList.find(p => p.id !== playerId && !p.finishedRank);
                 if (loser) {
-                    // رتبة "الخاسر الأخير" لكنه ليس منسحباً
                     updates[`rooms/${roomId}/players/${loser.id}/finishedRank`] = 888; 
                 }
             }
         }
     }
 
-    // تجهيز تحديثات اللاعب الحالي
     updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
     updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
     updates[`rooms/${roomId}/players/${playerId}/movesCount`] = (playersData[playerId].movesCount || 0) + 1;
-// تنفيذ عقوبة الاعتراض الخاطئ المؤجلة
-if (playersData[playerId].pendingChallengePenalty) {
 
-    const penaltyDraw = extractCardsToDraw(1, deck, discardPile);
-
-    deck = penaltyDraw.deck;
-    discardPile = penaltyDraw.discard;
-
-    myHand.push(...penaltyDraw.drawnCards);
-
-    updates[`rooms/${roomId}/players/${playerId}/hand`] = myHand;
-    updates[`rooms/${roomId}/players/${playerId}/handCount`] = myHand.length;
-
-    // حذف العقوبة بعد تنفيذها
-    updates[`rooms/${roomId}/players/${playerId}/pendingChallengePenalty`] = null;
-
-    updates[`rooms/${roomId}/game/toastMessage`] = {
-        msg: `⚠️ تم تنفيذ عقوبة الاعتراض الخاطئ على ${playersData[playerId].name}`,
-        time: Date.now()
-    };
-}
-    // حساب اللاعب التالي
     let nextPlayerId = getNextPlayerId(skipNext, nextDirection);
 
-    // التعامل مع سحب البطاقات الإجباري (إذا كان التراكم معطلاً)
     if (addedStack > 0 && !isStackingEnabled) {
-        const targetPlayerId = nextPlayerId; // اللاعب الذي عليه الدور الآن هو من سيسحب
+        const targetPlayerId = nextPlayerId; 
         const drawRes = extractCardsToDraw(newDrawStack, deck, discardPile);
         deck = drawRes.deck;
         discardPile = drawRes.discard;
@@ -650,9 +633,7 @@ if (playersData[playerId].pendingChallengePenalty) {
         updates[`rooms/${roomId}/players/${targetPlayerId}/handCount`] = targetHand.length;
         updates[`rooms/${roomId}/players/${targetPlayerId}/saidUno`] = false; 
         
-        newDrawStack = 0; // تصفير التراكم بعد السحب
-        
-        // في حال سحب +2 أو +4 والعدد 2، غالباً يقفز الدور ويعود لك
+        newDrawStack = 0; 
         nextPlayerId = getNextPlayerId(true, nextDirection);
     }
 
@@ -682,7 +663,6 @@ if (playersData[playerId].pendingChallengePenalty) {
         showToast("خطأ في الاتصال، حاول مجدداً");
     }
 }
-
 window.acceptDrawStack = async function() {
 if (gameState.turnState.currentTurnId !== playerId) return;
     
@@ -1010,6 +990,11 @@ window.handleChallenge = async function(targetId) {
         return showToast("يمكنك تقديم اعتراض فقط عندما يكون الدور لك!");
     }
 
+    // 🔥 منع الثغرة: إذا كان لديه عقوبة معلقة لم يستلمها بعد، لا يمكنه الاعتراض مجدداً
+    if (playersData[playerId].pendingPenalty === true) {
+        return showToast("لديك عقوبة معلقة بالفعل! يجب أن تنهي دورك أولاً.");
+    }
+
     const targetPlayer = playersData[targetId];
     if (targetPlayer.handCount !== 1) {
         return showToast("يمكنك الاعتراض فقط على اللاعب الذي يملك بطاقة واحدة!");
@@ -1023,22 +1008,16 @@ window.handleChallenge = async function(targetId) {
     const updates = {};
     let drawRes;
 
-if (targetPlayer.saidUno === true) {
-
-    // منع تكرار العقوبة أكثر من مرة بنفس الدور
-    if (playersData[playerId].pendingChallengePenalty) {
-        return showToast("لقد تمت معاقبتك مسبقاً بهذا الدور!");
-    }
-
-    // تسجيل عقوبة مؤجلة بدلاً من إعطاء البطاقة فوراً
-    updates[`rooms/${roomId}/players/${playerId}/pendingChallengePenalty`] = true;
-
-    updates[`rooms/${roomId}/game/toastMessage`] = { 
-        msg: `❌ اعتراض خاطئ! سيتم سحب بطاقة لك بعد انتهاء دورك.`, 
-        time: Date.now() 
-    };
-}
-    else {
+    if (targetPlayer.saidUno === true) {
+        // 🔥 تعديل: الاعتراض خاطئ -> لا تسحب فوراً، بل ضع علامة عقوبة معلقة وتنفذ عند نهاية الدور
+        updates[`rooms/${roomId}/players/${playerId}/pendingPenalty`] = true;
+        
+        updates[`rooms/${roomId}/game/toastMessage`] = { 
+            msg: `❌ اعتراض خاطئ! ${targetPlayer.name} سبق وقال UNO. (ستستلم بطاقة العقوبة عند نهاية دورك)`, 
+            time: Date.now() 
+        };
+    } else {
+        // الاعتراض صحيح -> العقوبة على اللاعب المستهدف تسير كالمعتاد فوراً
         drawRes = extractCardsToDraw(2, deck, discardPile);
         let targetHand = (targetPlayer.hand || []).concat(drawRes.drawnCards);
         updates[`rooms/${roomId}/players/${targetId}/hand`] = targetHand;
@@ -1048,13 +1027,14 @@ if (targetPlayer.saidUno === true) {
             msg: `🚨 صاااده! ${targetPlayer.name} نسى يقول UNO وسحب بطاقتين!`, 
             time: Date.now() 
         };
+        
+        // تحديث الكروت لأن السحب تم فوراً للاعب الآخر
+        updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
+        updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     }
 
-    updates[`rooms/${roomId}/game/deck`] = drawRes.deck;
-    updates[`rooms/${roomId}/game/discardPile`] = drawRes.discard;
     await update(ref(db), updates);
 };
-
 let challengeResolver = null;
 
 window.openChallengeModal = function(targetName) {
@@ -1073,6 +1053,8 @@ window.closeChallengeModal = function(result) {
         challengeResolver = null;
     }
 };
+
+
 function formatDuration(ms) {
     if (!ms) return "~";
     const totalSeconds = Math.floor(ms / 1000);
@@ -1204,8 +1186,10 @@ async function handleAutoTransition() {
         [`rooms/${roomId}/players/${playerId}/handCount`]: null,
         [`rooms/${roomId}/players/${playerId}/finishedRank`]: null,
         [`rooms/${roomId}/players/${playerId}/saidUno`]: null,
-[`rooms/${roomId}/players/${playerId}/movesCount`]: null,
-[`rooms/${roomId}/players/${playerId}/pendingChallengePenalty`]: null    };
+        [`rooms/${roomId}/players/${playerId}/movesCount`]: null,
+        // 🔥 تنظيف متغير العقوبة المعلقة عند الخروج للـ لوبي
+        [`rooms/${roomId}/players/${playerId}/pendingPenalty`]: null 
+    };
     await update(ref(db), playerUpdates);
 
     if (isAdmin) {
