@@ -325,7 +325,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-let processingTimeoutTurn = null;
 
 const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get('r');
@@ -744,7 +743,24 @@ onValue(playersRef, (snap) => {
         
     if (playersData[playerId]?.hand) myHand = playersData[playerId].hand;
 
+    if (gameState && gameState.status !== 'finished' && gameState.turnState) {
+        const currentTurnId = gameState.turnState.currentTurnId;
+        const currentPlayer = playersData[currentTurnId];
 
+        if (currentPlayer && currentPlayer.isDisconnected) {
+            const firstOnlinePlayer = activePlayersList.find(p => !p.isDisconnected);
+            
+            if (firstOnlinePlayer && firstOnlinePlayer.id === playerId) {
+                console.log(`⚠️ اللاعب ${currentPlayer.name} انقطع اتصاله أثناء دوره! جاري التخطي...`);
+                
+                setTimeout(() => {
+                    if (playersData[currentTurnId] && playersData[currentTurnId].isDisconnected) {
+                         handleTimeoutPenalty(currentTurnId);
+                    }
+                }, 1000);
+            }
+        }
+    }
 
     renderGame();
 });
@@ -825,42 +841,11 @@ function startTurnTimer(expireAt) {
     }, 1000);
 }
 async function handleTimeoutPenalty(timedOutPlayerId) {
-
-    // معرف فريد للدور الحالي
-    const currentTurnKey = `${timedOutPlayerId}_${gameState.turnState.lastUpdated}`;
-
-    // منع التكرار
-    if (processingTimeoutTurn === currentTurnKey) {
-        return;
-    }
-
-    processingTimeoutTurn = currentTurnKey;
-
-    // تأكد أن اللاعب مازال صاحب الدور
-    if (gameState.turnState.currentTurnId !== timedOutPlayerId) {
-        processingTimeoutTurn = null;
-        return;
-    }
-
-    // تأكد أنه مازال مفصول
-    if (!playersData[timedOutPlayerId]?.isDisconnected) {
-        processingTimeoutTurn = null;
-        return;
-    }
-
     let deck = [...(gameState.deck || [])];
     let discardPile = [...(gameState.discardPile || [])];
     const timedOutPlayer = playersData[timedOutPlayerId];
-    // لا تعاقب إلا إذا كان هذا اللاعب هو صاحب الدور فعلاً
-if (gameState.turnState.currentTurnId !== timedOutPlayerId) {
-    processingTimeoutTurn = null;
-    return;
-}
-
-    if (!timedOutPlayer) {
-        processingTimeoutTurn = null;
-        return;
-    }
+    
+    if (!timedOutPlayer) return;
 
     const currentHand = timedOutPlayer.hand || [];
     const drawStack = gameState.turnState.drawStack || 0;
@@ -909,7 +894,6 @@ if (gameState.turnState.currentTurnId !== timedOutPlayerId) {
     };
 
     await update(ref(db), updates);
-    processingTimeoutTurn = null;
 }
 
 window.showToast = function(msg) {
