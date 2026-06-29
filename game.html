@@ -232,128 +232,6 @@
 .is-disconnected-gray .player-name {
     color: #ff4d4d !important;
 }
-/* 1. تأثير الطبقات الثلاثي الأبعاد لكومة السحب وكومة الرمي */
-#deckPile, #discardPile {
-    position: relative;
-    transition: transform 0.1s ease, box-shadow 0.2s ease;
-    /* إعطاء إيحاء بوجود كروت متراكمة بالخلف عبر الظلال المتعددة */
-    box-shadow: 
-        0 1px 1px rgba(0,0,0,0.15),
-        2px 3px 0px rgba(0,0,0,0.2),
-        4px 6px 0px rgba(0,0,0,0.15),
-        6px 9px 0px rgba(0,0,0,0.1);
-}
-
-/* تأثير الضغط للداخل عند لمس الكومة في الدور */
-.deck-clickable:active {
-    transform: scale(0.95) !important;
-    box-shadow: 0 2px 2px rgba(0,0,0,0.3) !important;
-}
-
-/* 2. وميض كومة السحب الذهبي (عند قفل اللعب فقط) */
-@keyframes goldPulse {
-    0% { box-shadow: 0 0 5px #ffd700, 2px 3px 0px rgba(0,0,0,0.2); }
-    50% { box-shadow: 0 0 20px #ffd700, 4px 6px 0px rgba(0,0,0,0.3); }
-    100% { box-shadow: 0 0 5px #ffd700, 2px 3px 0px rgba(0,0,0,0.2); }
-}
-.pulse-glow {
-    animation: goldPulse 1.5s infinite ease-in-out;
-    border: 2px solid #ffd700 !important;
-}
-
-/* أيقونة اليد الملموسة داخل الكومة */
-.deck-hand-icon {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 24px;
-    pointer-events: none;
-    animation: handBounce 1s infinite alternate;
-}
-@keyframes handBounce {
-    0% { transform: translate(-50%, -40%); }
-    100% { transform: translate(-50%, -60%); }
-}
-
-/* 3. إضاءة هادئة وثابتة للاعب صاحب الدور حسب لونه */
-.player-seat.is-turn .avatar-wrap {
-    border-radius: 50%;
-    /* سيتم حقن لون الـ box-shadow برمجياً من الـ JavaScript لتطابق لون الـ Slot */
-    animation: subtleGlow 2s infinite ease-in-out;
-}
-@keyframes subtleGlow {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.04); }
-}
-
-/* سهم اتجاه اللعب الدائري المتحرك */
-.direction-arrow-svg {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-}
-.direction-arrow-svg.clockwise {
-    animation: rotateCW 8s linear infinite;
-}
-.direction-arrow-svg.counter-clockwise {
-    animation: rotateCCW 8s linear infinite;
-}
-@keyframes rotateCW { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes rotateCCW { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-
-/* 4. تحجيم وتفاعل الكروت السفلى باللمس والسحب */
-.my-card-element {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    touch-action: none; /* يمنع متصفح الجوال من عمل سحب عشوائي للصفحة أثناء سحب الكارت */
-}
-.my-card-element.card-selected {
-    transform: translateY(-25px) scale(1.05) !important;
-    z-index: 999 !important;
-    box-shadow: 0 10px 20px rgba(255,255,255,0.4), 0 0 15px #fff !important;
-}
-.my-card-element.dragging {
-    transition: none !important;
-    opacity: 0.85;
-}
-
-/* 5. تصميم الـ Toasts الملونة الذكية */
-.toast-msg {
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-weight: bold;
-    color: #fff;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-}
-.toast-success-hunt { background: #0f2027; border: 2px solid #00ff88; text-shadow: 0 0 5px #00ff88; } /* صيدات */
-.toast-penalty-error { background: #1a0505; border: 2px solid #ff4d4d; text-shadow: 0 0 5px #ff4d4d; animation: shake 0.3s ease; } /* أخطاء */
-.toast-normal-uno { background: #1f1c18; border: 2px solid #ffaa00; text-shadow: 0 0 5px #ffaa00; } /* أحداث عادية */
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-8px); }
-    75% { transform: translateX(8px); }
-}
-
-/* 6. شارة الفائز المحسنة */
-.winner-badge {
-    position: absolute;
-    bottom: -5px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(45deg, #ffd700, #ffa500);
-    color: #000;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: bold;
-    white-space: nowrap;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    z-index: 10;
-}
 </style>
 </head>
 <body>
@@ -594,55 +472,6 @@ function renderGame() {
         stackingAlert.style.display = 'none';
     }
     applyDynamicMargins();
-}
-
-// استدع هذه الدالة دائماً في نهاية دالة الـ renderGame الخاصة بك لتفعيل ميزة السحب والرمي
-function enableCardDragAndDrop() {
-    const cards = document.querySelectorAll('.my-card-element'); // تأكد أن كروتك تحمل هذا الكلاس
-    const centerArea = document.getElementById('discardPile'); // الهدف هو كومة الرمي المركزية
-
-    cards.forEach(card => {
-        let startX, startY, moveX, moveY;
-        let originalTransition = card.style.transition;
-
-        card.addEventListener('touchstart', (e) => {
-            // تفعيل كلاس التحديد المرتفع عند اللمس
-            card.classList.add('card-selected', 'dragging');
-            const touch = e.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-        }, { passive: true });
-
-        card.addEventListener('touchmove', (e) => {
-            const touch = e.touches[0];
-            moveX = touch.clientX - startX;
-            moveY = touch.clientY - startY;
-
-            // تحريك الكارت تزامناً مع إصبع اللاعب
-            card.style.transform = `translate(${moveX}px, ${moveY}px) scale(1.05)`;
-        }, { passive: true });
-
-        card.addEventListener('touchend', async (e) => {
-            card.classList.remove('card-selected', 'dragging');
-            card.style.transition = originalTransition;
-
-            // التحقق من أن الكارت تم إفلاته فوق منطقة رمي الأوراق (المركز)
-            const centerRect = centerArea.getBoundingClientRect();
-            const touchX = e.changedTouches[0].clientX;
-            const touchY = e.changedTouches[0].clientY;
-
-            if (touchX >= centerRect.left && touchX <= centerRect.right &&
-                touchY >= centerRect.top && touchY <= centerRect.bottom) {
-                
-                // تم الإفلات بالمركز بنجاح! نقوم بمحاكاة عملية النقر ولعب الكارت فوراً
-                card.style.transform = 'none';
-                card.click(); // استدعاء حدث الـ onclick الأصلي الخاص بالكارت للعب
-            } else {
-                // إعادة الكارت لمكانه الطبيعي في اليد إذا أفلت بعيداً
-                card.style.transform = 'none';
-            }
-        });
-    });
 }
 
 window.selectColor = function(color) {
@@ -946,36 +775,24 @@ onValue(gameRef, (snap) => {
     if (!gameState) return;
 
     if (gameState.status === 'finished') {
-        // ... كود إنهاء المؤقت الحالي لديك ...
+        if (gameTimerInterval) clearInterval(gameTimerInterval);
+        document.getElementById('gameTimer').innerText = ''; 
+        setTimeout(() => { showLeaderboard(); }, 600); 
     } else {
         renderGame();
 
-        // --- [مطور] منطق وميض الكومة وأيقونة اليد الذكي ---
-        const deckElement = document.getElementById('deckPile');
-        // إزالة الأيقونة القديمة إن وجدت
-        const oldIcon = deckElement.querySelector('.deck-hand-icon');
-        if (oldIcon) oldIcon.remove();
-        deckElement.classList.remove('pulse-glow', 'deck-clickable');
+        // --- منطق التخطي التلقائي للمفصولين ---
+        const currentTurnId = gameState.turnState.currentTurnId;
+        const currentPlayer = playersData[currentTurnId];
 
-        if (gameState.turnState && gameState.turnState.currentTurnId === playerId) {
-            deckElement.classList.add('deck-clickable');
+        if (currentPlayer && currentPlayer.isDisconnected) {
+            // من الذي سيقوم بعملية التخطي؟ (أول لاعب متصل متاح)
+            const firstOnlinePlayer = activePlayersList.find(p => !p.isDisconnected);
             
-            // دالة لفحص هل لدى اللاعب كارت صالح للعب أم لا
-            const hasValidCard = myHand.some(cardStr => {
-                const c = parseCard(cardStr);
-                const topCard = parseCard(gameState.discardPile[gameState.discardPile.length - 1]);
-                return c.color === gameState.turnState.selectedColor || 
-                       c.value === topCard.value || 
-                       c.isWild || cardStr.includes("wild");
-            });
-
-            // تنبض الكومة وتظهر اليد فقط إذا لم يكن لديه كارت مناسب ولا يوجد تراكم سحب
-            if (!hasValidCard && (!gameState.turnState.drawStack || gameState.turnState.drawStack <= 0)) {
-                deckElement.classList.add('pulse-glow');
-                const handIcon = document.createElement('div');
-                handIcon.className = 'deck-hand-icon';
-                handIcon.innerText = '🫳';
-                deckElement.appendChild(handIcon);
+            if (firstOnlinePlayer && firstOnlinePlayer.id === playerId) {
+                // أنا أول واحد متصل، سأقوم بمهمة تخطي هذا اللاعب المفصول
+                console.log(`اللاعب ${currentPlayer.name} مفصول، أقوم بتخطيه...`);
+                handleTimeoutPenalty(currentTurnId);
             }
         }
         // ---------------------------------------
@@ -1084,16 +901,6 @@ window.showToast = function(msg) {
     const toast = document.createElement('div');
     toast.className = 'toast-msg';
     toast.innerText = msg;
-
-    // فحص محتوى الرسالة لتحديد صنف الـ UX المناسب للون
-    if (msg.includes("صاااده") || msg.includes("اعتراض صحيح")) {
-        toast.classList.add('toast-success-hunt');
-    } else if (msg.includes("ليس دورك") || msg.includes("اعتراض خاطئ") || msg.includes("تضغط UNO فقط")) {
-        toast.classList.add('toast-penalty-error');
-    } else {
-        toast.classList.add('toast-normal-uno'); // إعلانات الـ UNO العادية والسحب الطبيعي
-    }
-
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 };
@@ -1136,47 +943,37 @@ window.layoutPlayers = function(playersData, myId, currentTurnId) {
         .sort((a, b) => parseInt(a.slot.split('-')[1]) - parseInt(b.slot.split('-')[1]));
 
     const count = playersArray.length;
+    
     const activeConfig = seatPositions[count] || seatPositions[2];
-    const rankBadges = {1: "🥇 الأول", 2: "🥈 الثاني", 3: "🥉 الثالث", 4: "🏅 الرابع"};
-
+    
     playersArray.forEach((p, i) => {
         const pos = activeConfig[i];
         if (!pos) return; 
 
         const seat = document.createElement('div');
+        
         const isUnoDanger = (p.handCount === 1) ? 'uno-danger' : '';
-        
-        // تعديل: الفائز لا يصبح رمادياً بالكامل بل يحمل شارة انتصار واضحة وبقاء صورته ملونة
         const isFinished = p.finishedRank ? 'finished-player' : '';
+        
+        let disconnectClass = '';
+        let timerHTML = '';
+        
+        // داخل دالة layoutPlayers
         const isDisconnected = p.isDisconnected ? 'is-disconnected-gray' : '';
-        const isCurrentTurn = (p.id === currentTurnId && !p.finishedRank);
-        
-        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${isCurrentTurn ? 'is-turn' : ''} ${isFinished} ${isDisconnected}`;        
-        
-        // تعيين إحداثيات المقاعد
-        if (pos.side === 'left') seat.style.cssText = `top: ${pos.top}%; left: ${pos.left}px; transform: translateY(-50%);`;
-        else if (pos.side === 'right') seat.style.cssText = `top: ${pos.top}%; right: ${pos.right}px; transform: translateY(-50%);`;
-        else if (pos.side === 'top') seat.style.cssText = `top: ${pos.top}px; left: ${pos.left}%; transform: translateX(-50%);`;
-
-        // حقن لون الـ Slot كإضاءة حول المقعد إذا كان دوره هادئاً وبدون تشتيت
-        if (isCurrentTurn) {
-            // استخراج لون الـ Slot من العنصر نفسه برمجياً أو استخدام لون افتراضي مأخوذ من الـ CSS الخاص بالسلوت
-            let slotColor = "var(--uno-yellow)"; 
-            if(p.slot === 'slot-1') slotColor = "#7b241c";
-            if(p.slot === 'slot-2') slotColor = "#154360";
-            seat.style.boxShadow = `0 0 20px ${slotColor}`;
-        }
-
-        // شارة الفائز بدلاً من تصفير العداد واختفائه
-        let badgeHTML = `<div class="card-count-badge ${isUnoDanger}">${p.handCount || 0}</div>`;
-        if (p.finishedRank) {
-            badgeHTML = `<div class="winner-badge">${rankBadges[p.finishedRank] || p.finishedRank}</div>`;
+        seat.className = `player-seat ${p.slot} ${p.id === myId ? 'is-me' : ''} ${p.id === currentTurnId && !p.finishedRank ? 'is-turn' : ''} ${isFinished} ${isDisconnected}`;        
+        if (pos.side === 'left') {
+            seat.style.cssText = `top: ${pos.top}%; left: ${pos.left}px; transform: translateY(-50%);`;
+        } else if (pos.side === 'right') {
+            seat.style.cssText = `top: ${pos.top}%; right: ${pos.right}px; transform: translateY(-50%);`;
+        } else if (pos.side === 'top') {
+            seat.style.cssText = `top: ${pos.top}px; left: ${pos.left}%; transform: translateX(-50%);`;
         }
 
         seat.innerHTML = `
             <div class="avatar-wrap" onclick="handleChallenge('${p.id}')">
                 <img src="${p.avatar}">
-                ${badgeHTML}
+                <div class="card-count-badge ${isUnoDanger}">${p.handCount || 0}</div>
+                ${timerHTML}
             </div>
             <div class="player-name">${p.name}${p.id === myId ? ' <span class="me-tag">(أنت)</span>' : ''}</div>
         `;
